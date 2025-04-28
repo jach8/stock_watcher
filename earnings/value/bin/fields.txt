@@ -1,0 +1,509 @@
+    {
+    headerName: "Industry"
+    feildName: "industry"
+    },
+     
+    {
+    feildName: "industrykey"
+    },
+     
+    {
+    headerName: "Industry"
+    feildName: "industrydisp"
+
+    },
+     
+    {
+    headerName: "Sector"
+    feildName: "sector"
+    },
+     
+    {
+    feildName: "sectorkey"
+    },
+     
+    {
+    feildName: "sectordisp"
+    },
+     
+    {
+    feildName: "longbusinesssummary"
+    },
+     
+     
+    {
+    feildName: "auditrisk"
+    },
+     
+    {
+    feildName: "boardrisk"
+    },
+     
+    {
+    feildName: "compensationrisk"
+    },
+     
+    {
+    feildName: "shareholderrightsrisk"
+    },
+     
+    {
+    feildName: "overallrisk"
+    },
+     
+    {
+    feildName: "governanceepochdate"
+    },
+     
+    {
+    feildName: "compensationasofepochdate"
+    },
+     
+    {
+    feildName: "irwebsite"
+    },
+     
+    {
+    feildName: "maxage"
+    },
+     
+    {
+    feildName: "pricehint"
+    },
+     
+    {
+    feildName: "previousclose"
+    },
+     
+    {
+    feildName: "open"
+    },
+     
+    {
+    feildName: "daylow"
+    },
+     
+    {
+    feildName: "dayhigh"
+    },
+     
+    {
+    feildName: "regularmarketpreviousclose"
+    },
+     
+    {
+    feildName: "regularmarketopen"
+    },
+     
+    {
+    feildName: "regularmarketdaylow"
+    },
+     
+    {
+    feildName: "regularmarketdayhigh"
+    },
+     
+    {
+    feildName: "exdividenddate"
+    },
+     
+    {
+    feildName: "fiveyearavgdividendyield"
+    },
+     
+    {
+    feildName: "beta"
+    },
+     
+    {
+    feildName: "trailingpe"
+    },
+     
+    {
+    feildName: "forwardpe"
+    },
+     
+    {
+    feildName: "volume"
+    },
+     
+    {
+    feildName: "regularmarketvolume"
+    },
+     
+    {
+    feildName: "averagevolume"
+    },
+     
+    {
+    feildName: "averagevolume10days"
+    },
+     
+    {
+    feildName: "averagedailyvolume10day"
+    },
+     
+    {
+    feildName: "bid"
+    },
+     
+    {
+    feildName: "ask"
+    },
+     
+    {
+    feildName: "bidsize"
+    },
+     
+    {
+    feildName: "asksize"
+    },
+     
+    {
+    feildName: "marketcap"
+    },
+     
+    {
+    feildName: "fiftytwoweeklow"
+    },
+     
+    {
+    feildName: "fiftytwoweekhigh"
+    },
+     
+    {
+    feildName: "pricetosalestrailing12months"
+    },
+     
+    {
+    feildName: "fiftydayaverage"
+    },
+     
+    {
+    feildName: "twohundreddayaverage"
+    },
+     
+    {
+    feildName: "currency"
+    },
+     
+    {
+    feildName: "enterprisevalue"
+    },
+     
+    {
+    feildName: "profitmargins"
+    },
+     
+    {
+    feildName: "floatshares"
+    },
+     
+    {
+    feildName: "sharesoutstanding"
+    },
+     
+    {
+    feildName: "sharesshort"
+    },
+     
+    {
+    feildName: "sharesshortpriormonth"
+    },
+     
+    {
+    feildName: "sharesshortpreviousmonthdate"
+    },
+     
+    {
+    feildName: "dateshortinterest"
+    },
+     
+    {
+    feildName: "sharespercentsharesout"
+    },
+     
+    {
+    feildName: "heldpercentinsiders"
+    },
+     
+    {
+    feildName: "heldpercentinstitutions"
+    },
+     
+    {
+    feildName: "shortratio"
+    },
+     
+    {
+    feildName: "shortpercentoffloat"
+    },
+     
+    {
+    feildName: "impliedsharesoutstanding"
+    },
+     
+    {
+    feildName: "bookvalue"
+    },
+     
+    {
+    feildName: "pricetobook"
+    },
+     
+    {
+    feildName: "lastfiscalyearend"
+    },
+     
+    {
+    feildName: "nextfiscalyearend"
+    },
+     
+    {
+    feildName: "mostrecentquarter"
+    },
+     
+    {
+    feildName: "earningsquarterlygrowth"
+    },
+     
+    {
+    feildName: "netincometocommon"
+    },
+     
+    {
+    feildName: "trailingeps"
+    },
+     
+    {
+    feildName: "forwardeps"
+    },
+     
+    {
+    feildName: "pegratio"
+    },
+     
+    {
+    feildName: "lastsplitfactor"
+    },
+     
+    {
+    feildName: "lastsplitdate"
+    },
+     
+    {
+    feildName: "enterprisetorevenue"
+    },
+     
+    {
+    feildName: "enterprisetoebitda"
+    },
+     
+    {
+    feildName: "52weekchange"
+    },
+     
+    {
+    feildName: "sandp52weekchange"
+    },
+     
+    {
+    feildName: "lastdividendvalue"
+    },
+     
+    {
+    feildName: "lastdividenddate"
+    },
+     
+    {
+    feildName: "exchange"
+    },
+     
+    {
+    feildName: "quotetype"
+    },
+     
+    {
+    feildName: "symbol"
+    },
+     
+    {
+    feildName: "underlyingsymbol"
+    },
+     
+    {
+    feildName: "shortname"
+    },
+     
+    {
+    feildName: "longname"
+    },
+     
+    {
+    feildName: "firsttradedateepochutc"
+    },
+     
+    {
+    feildName: "timezonefullname"
+    },
+     
+    {
+    feildName: "timezoneshortname"
+    },
+     
+    {
+    feildName: "uuid"
+    },
+     
+    {
+    feildName: "messageboardid"
+    },
+     
+    {
+    feildName: "gmtoffsetmilliseconds"
+    },
+     
+    {
+    feildName: "currentprice"
+    },
+     
+    {
+    feildName: "targethighprice"
+    },
+     
+    {
+    feildName: "targetlowprice"
+    },
+     
+    {
+    feildName: "targetmeanprice"
+    },
+     
+    {
+    feildName: "targetmedianprice"
+    },
+     
+    {
+    feildName: "recommendationmean"
+    },
+     
+    {
+    feildName: "recommendationkey"
+    },
+     
+    {
+    feildName: "numberofanalystopinions"
+    },
+     
+    {
+    feildName: "totalcash"
+    },
+     
+    {
+    feildName: "totalcashpershare"
+    },
+     
+    {
+    feildName: "ebitda"
+    },
+     
+    {
+    feildName: "totaldebt"
+    },
+     
+    {
+    feildName: "quickratio"
+    },
+     
+    {
+    feildName: "currentratio"
+    },
+     
+    {
+    feildName: "totalrevenue"
+    },
+     
+    {
+    feildName: "debttoequity"
+    },
+     
+    {
+    feildName: "revenuepershare"
+    },
+     
+    {
+    feildName: "returnonassets"
+    },
+     
+    {
+    feildName: "returnonequity"
+    },
+     
+    {
+    feildName: "freecashflow"
+    },
+     
+    {
+    feildName: "operatingcashflow"
+    },
+     
+    {
+    feildName: "earningsgrowth"
+    },
+     
+    {
+    feildName: "revenuegrowth"
+    },
+     
+    {
+    feildName: "grossmargins"
+    },
+     
+    {
+    feildName: "ebitdamargins"
+    },
+     
+    {
+    feildName: "operatingmargins"
+    },
+     
+    {
+    feildName: "financialcurrency"
+    },
+     
+    {
+    feildName: "trailingpegratio"
+    },
+     
+    {
+    feildName: "date"
+    },
+     
+    {
+    feildName: "dividendrate"
+    },
+     
+    {
+    feildName: "dividendyield"
+    },
+     
+    {
+    feildName: "payoutratio"
+    },
+     
+    {
+    feildName: "trailingannualdividendrate"
+    },
+     
+    {
+    feildName: "trailingannualdividendyield"
+    },
+     
+    {
+    feildName: "address2"
+    },
+     
+    {
+    feildName: "fax"
+    },
+    
