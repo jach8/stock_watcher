@@ -1,8 +1,6 @@
 import os 
 import shutil
 
-#### Do NOT DELETE ANY FILES ####
-
 
 # Ignore filetypes
 ignore_filetypes = ['.pyc','ipynb','pkl']

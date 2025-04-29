@@ -178,3 +178,4 @@ plots/__pycache__/utils.cpython-312.pyc
 .DS_Store
 *.pyc
 *earnings/
+ignore_files.py
