@@ -1,1 +1,0 @@
-nasdaq = "D84Zdmsatk1fq6gD6ykm"

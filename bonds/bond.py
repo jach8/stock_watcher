@@ -5,7 +5,7 @@ import os
 import sys
 from tqdm import tqdm 
 from pandas_datareader import data as web
-sys.path.append('/Users/jerald/Documents/Dir/Python/Stocks')
+
 
 def get_fred_data(start_date, code, name = None):
     data = web.DataReader(code, 'fred', start_date)
@@ -44,6 +44,9 @@ class bonds():
         return pd.read_sql('select * from us_bonds', self.bonds_db, parse_dates=['DATE']).sort_index()
     
 if __name__ == '__main__':
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
     from bin.main import get_path 
     
     c = get_path()

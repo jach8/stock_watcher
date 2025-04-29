@@ -2,8 +2,8 @@
 Module for detecting changes in stock price trends.
 Provides functionality to analyze trends across multiple stocks using the TrendAnalyzer.
 """
-import sys
 import logging
+import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 from dataclasses import dataclass
@@ -46,20 +46,24 @@ class TrendResult:
 class TResults:
     """Class for detecting and analyzing changes in stock price trends."""
     
-    def __init__(self, connections: Dict|str, lookback_days: int = 90):
+    def __init__(self, connections: Dict|str, lookback_days: int = 90, window_size: int = 30, period: int = 3):
         """
         Initialize the TResults.
     
         Args:
             connections: Dictionary of database connections
             lookback_days: Number of days to look back for trend analysis
+            window_size: Size of the rolling window for trend analysis
+            period: Period for trend analysis
         """
         self.lookback_days = lookback_days
-        self.trend_analyzer = TrendAnalyzer()
+        self.window_size = window_size
+        self.period = period
         
         # Initialize data connection
         self.data_manager = Manager(connections)
         self.stocks = self.data_manager.Pricedb.stocks['all_stocks']
+        self.trend_analyzer = TrendAnalyzer()
 
     def get_aligned_data(self, stock: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
@@ -114,14 +118,10 @@ class TResults:
                 trend_direction, seasonality, slope = self.trend_analyzer.analyze(data)
                 
                 # Configure change point detection
-                if metric_name in ['close_prices', 'stock_volume']:
-                    window_size = 28
-                    scale = True
-                    period = 5
-                else:
-                    window_size = 30
-                    scale = True
-                    period = 3
+
+                window_size = self.window_size
+                scale = True
+                period = self.period
                 
                 # Detect change points
                 signal = ChangePointDetector(
@@ -178,7 +178,7 @@ class TResults:
 def main():
     """Example usage of the TResults class."""
     connections = get_path()
-    detector = TResults(connections, lookback_days=90)
+    detector = TResults(connections, lookback_days=15)
     results = detector.analyze_stocks()
     print("\nTrend Analysis Results:")
     print(results)

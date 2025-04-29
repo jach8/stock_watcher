@@ -10,7 +10,12 @@ from trend_detector import TrendAnalyzer
 class ChangePointDetector:
     """A class for detecting change points in time series data with parameter optimization."""
     
-    def __init__(self, data: Union[Series, DataFrame], scale: bool = True, period: int = 21, window_size: Optional[int] = None) -> None:
+    def __init__(self, 
+            data: Union[Series, DataFrame], 
+            scale: bool = True, 
+            period: int = 21, 
+            window_size: Optional[int] = None
+        ) -> None:
         """
         Initialize the detector with data.
         
