@@ -55,12 +55,12 @@ def animate_yield_curve(df):
 
 
 if __name__ == '__main__':
-    import sys 
-    import os
 
-    print(sys.path)
-    # from main import Manager 
-
-    # m = Manager()
-    # bonds = m.Bonds.bond_df().set_index('DATE')
-    # compare_current_yields(bonds)
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).resolve().parents[2]))
+    from main import Manager 
+    m = Manager()
+    bonds = m.Bonds.bond_df().set_index('DATE')
+    fig, ax = compare_current_yields(bonds)
+    fig.show()
