@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 from dataclasses import dataclass
-from typing import List, Tuple, Optional, Dict
+from typing import List, Tuple, Optional, Dict, Any
 import pandas as pd
 from tqdm import tqdm
 
@@ -19,6 +19,7 @@ logging.basicConfig(
 
 from bin.models.trends.trend_detector import TrendAnalyzer
 from bin.models.trends.change_detection import ChangePointDetector
+from bin.models.trends.peakDetector import PeakDetector
 from bin.main import get_path
 from main import Manager
 
@@ -30,8 +31,9 @@ class TrendResult:
     trend_direction: str
     seasonality: str
     slope: float
-    change_point: float
-
+    change_point: Optional[float] = None
+    valley: Any = None
+    peaks: Any = None
     # Return as a dictionary
     def to_dict(self) -> Dict:
         return {
@@ -40,7 +42,9 @@ class TrendResult:
             "trend_direction": self.trend_direction,
             "seasonality": self.seasonality,
             "slope": self.slope,
-            "change_point": self.change_point
+            "change_point": self.change_point,
+            "valley": self.valley,
+            "peaks": self.peaks
         }
 
 class TResults:
@@ -63,7 +67,8 @@ class TResults:
         # Initialize data connection
         self.data_manager = Manager(connections)
         self.stocks = self.data_manager.Pricedb.stocks['all_stocks']
-        self.trend_analyzer = TrendAnalyzer()
+        self.trend_analyzer = TrendAnalyzer(period = self.period)
+        self.peak_detector = PeakDetector(prominence=0.5, distance = 2)
 
     def get_aligned_data(self, stock: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
@@ -130,6 +135,20 @@ class TResults:
                     period=period,
                     window_size=window_size
                 )
+                change_points = signal.get_last_change_point(
+                    # Sensitivity from 0.01, to 0.2, with a step of 0.04
+                    sensitivity_range=(0.01, 0.2, 0.04), 
+                    # Threshold from 0.5 to 2, with a step of 0.5
+                    threshold_range=(0.5, 2, 0.5),
+                    min_triggers = 4, 
+                    max_triggers = 20
+                    ).Signal
+
+
+                peaks = self.peak_detector.find_peaks(data.values)
+                peak_dates = data.index[peaks]
+                valleys = self.peak_detector.find_valleys(data.values)
+                valley_dates = data.index[valleys]
                 
                 # Create and store result
                 results.append(
@@ -139,7 +158,9 @@ class TResults:
                         trend_direction=trend_direction,
                         seasonality=seasonality,
                         slope=slope,
-                        change_point=signal.get_last_change_point().Signal
+                        change_point=change_points,
+                        valley=valley_dates.max(),
+                        peaks=peak_dates.max(),
                     )
                 )
             
@@ -151,6 +172,36 @@ class TResults:
         except Exception as e:
             logging.error(f"Unexpected error analyzing {stock}: {str(e)}")
             return None
+        
+    def __convert_to_dataframe(self, results: List[TrendResult]) -> pd.DataFrame:
+        """
+        Convert list of TrendResult objects to a DataFrame.
+
+        Args:
+            results: List of TrendResult objects
+
+        Returns:
+            DataFrame containing trend analysis results
+        """
+        # Convert to DataFrame
+        data = []
+        for i in results:
+            for result in i:
+                data.append({
+                    'stock': result.stock,
+                    'metric': result.name,
+                    'trend_direction': result.trend_direction,
+                    'seasonality': result.seasonality,
+                    'slope': result.slope,
+                    'change_point': result.change_point, 
+                    'last_valley': result.valley,
+                    'last_peak': result.peaks,
+                })
+        df = pd.DataFrame(data)
+
+        # Flag slope discrepancies (where trend direction and slope sign don't match)
+        df['slope_discrepancy'] = ((df['trend_direction'] == 'up') & (df['slope'] < 0)) | ((df['trend_direction'] == 'down') & (df['slope'] > 0))
+        return df 
 
     def analyze_stocks(self, stocks: Optional[List[str]] = None) -> pd.DataFrame:
         """
@@ -173,6 +224,9 @@ class TResults:
                 results.append(result)
                 pbar.set_postfix({'Success': True})
 
+
+        # Convert results to DataFrame
+        self.result_df = self.__convert_to_dataframe(results)
         return results
     
 def main():
@@ -182,7 +236,10 @@ def main():
     results = detector.analyze_stocks()
     print("\nTrend Analysis Results:")
     print(results)
-    print(pd.DataFrame(results))
+
+    print(detector.result_df)
+    detector.result_df.to_csv("trend_analysis_results.csv", index=False)
+
 
 if __name__ == "__main__":
     main()

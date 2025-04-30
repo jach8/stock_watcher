@@ -253,7 +253,7 @@ class ChangePointDetector:
         threshold_range: Tuple[float, float, float] = (0.1, 2.0, 0.1),
         min_triggers: int = 5,
         max_triggers: int = 10
-        ) -> Optional[pd.Timestamp]:
+        ) -> DataFrame:
         """Get the last detected change point."""
         _, result_df = self.optimize_parameters(
             sensitivity_range=sensitivity_range,
