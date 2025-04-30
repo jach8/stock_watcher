@@ -284,7 +284,6 @@ def optimize_and_simulate(stock, df, method='heston_path', verbose = True, **kwa
 
     # Create SimulationParams object
     params = SimulationParams(S0=S0, mu=mu, sigma=sigma, **kwargs)
-
     if method == 'heston_path':
         # Calibrate Heston parameters
         optimized_params = heston_calibration(df, params)
@@ -302,6 +301,15 @@ def optimize_and_simulate(stock, df, method='heston_path', verbose = True, **kwa
     # Simulate stock prices
     simulated_prices = simulate_stock(stock, df, method=method, **kwargs)
     return simulated_prices
+
+def simulated_prices(stock, df, method, **kwargs):
+    """ Return a dataframe with respective dates for the simulated prices """
+    S = optimize_and_simulate(stock, df, method=method, **kwargs)
+    # dates = pd.date_range(start=df.index[-1], periods=S.shape[0], freq='B')
+    dates = pd.bdate_range(start=df.index[-1], periods=S.shape[0], freq='B')
+    S = pd.DataFrame(S, index=dates, columns=[f"Sim_{i+1}" for i in range(S.shape[1])])
+    S.index.name = 'Date'
+    return S
 
     
 if __name__ == "__main__":
@@ -323,13 +331,16 @@ if __name__ == "__main__":
     print(df.shape, S_sim.shape)
 
     df = p.Pricedb.get_multi_frame('amzn', ma = 'sma', start_date = "2024-01-01")
-    x = optimize_and_simulate(
-                stock = 'amzn', 
-                df = df, 
-                method = 'heston_path',
-                verbose = True
-                )
-    print(df.shape, x.shape)
+    # x = optimize_and_simulate(
+    #             stock = 'amzn', 
+    #             df = df, 
+    #             method = 'heston_path',
+    #             verbose = True, 
+    #             days = 100
+    #             )
+    # print(df.shape, x.shape)
+
+    print(simulated_prices('amzn', df, method='heston_path', days=100, number_of_sims=500))
 
     
 
