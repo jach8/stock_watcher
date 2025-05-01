@@ -18,20 +18,34 @@ def price_volume_oi_chart(df, pdf, fig, ax, stock = None):
 
 
     # Align the dataframes
-    pdf = pdf.loc[df.index]
+    # pdf = pdf.loc[df.index]
 
     ax = ax.flatten()
-
     ax[0].plot(pdf.index, pdf.close, label = 'Close', color = 'blue')
-    # Scatter plot high volume days
+    
+    # High Option Volume days
     high_option_vol_days = df[df.total_vol > df.total_vol.quantile(0.95)]
     high_option_vol_days = pdf.loc[high_option_vol_days.index]
-    ax[0].scatter(high_option_vol_days.index, high_option_vol_days.close, color = 'red', label = 'High Option Volume', s = 20)
 
-    # Scatter plot high volume days
+    # High Stock volume days
     high_volume_days = pdf[pdf.volume > pdf.volume.quantile(0.95)]
     high_volume_days = pdf.loc[high_volume_days.index]
-    ax[0].scatter(high_volume_days.index, high_volume_days.close, color = 'black', label = 'High Volume', s = 30, marker = '+')
+
+    # High Call Volume days
+    high_call_vol_days = df[df.call_vol > df.call_vol.quantile(0.95)]
+    high_call_vol_days = pdf.loc[high_call_vol_days.index]
+    
+    # High Put Volume days
+    high_put_vol_days = df[df.put_vol > df.put_vol.quantile(0.95)]
+    high_put_vol_days = pdf.loc[high_put_vol_days.index]
+    
+    try:
+        ax[0].scatter(high_option_vol_days.index, high_option_vol_days.close, color = 'red', label = 'Option Volume', s = 20)
+        ax[0].scatter(high_volume_days.index, high_volume_days.close, color = 'black', label = 'Stock Volume', s = 30, marker = '+')
+        ax[0].scatter(high_call_vol_days.index, high_call_vol_days.close, color = 'green', label = 'Call Volume', s = 20, marker = 'x')
+        ax[0].scatter(high_put_vol_days.index, high_put_vol_days.close, color = 'purple', label = 'Put Volume', s = 20, marker = 'x')
+    except:
+        pass
 
     ax[0].legend()
     ax[1].plot(pdf.index, pdf.volume, color = 'green')

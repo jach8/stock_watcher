@@ -189,6 +189,8 @@ if __name__ == "__main__":
     connections = get_path()
     oc = Manager(connections)
     
+    oc._manage_db()
+
     # print(oc.pcdb(oc.option_custom_q('select * from aapl', db = 'change_db')))
     # print(oc.option_custom_q('select * from spy', db = 'change_db'))
 

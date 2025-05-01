@@ -121,7 +121,7 @@ class Connector:
         except Exception as e:
             print("Connection Failed: ", e,)       
         
-    def __check_inactive_db_for_stock(self, stock: str) -> bool: 
+    def _check_inactive_db_for_stock(self, stock: str) -> bool: 
         """ 
         Check if the stock is in the inactive database 
         
@@ -139,7 +139,7 @@ class Connector:
         valid = cursor.execute(query).fetchone()[0]
         return bool(valid)
             
-    def __purge_inactive(self, stock: str) -> None:
+    def _purge_inactive(self, stock: str) -> None:
         """
         Purge Inactive Contracts from the Option_db database. 
             - Save them in the inactive_db so that we can use them for tracking. 

@@ -86,6 +86,26 @@ class CP(Connector):
         return bool(valid)
 
     def _get_query_str(self, stock: str) -> str:
+        #### Do these two queries yield the same result?
+        ### To Do: Run the first query to see if the results are the same
+        # q = f'''
+        #     SELECT 
+        #     max(datetime(gatherdate)) AS gatherdate,
+        #     CAST(SUM(volume) AS INT) AS total_vol,
+        #     CAST(SUM(cash) AS FLOAT) AS total_prem, 
+        #     CAST(SUM(openinterest) AS INT) AS total_oi,
+        #     CAST(SUM(CASE WHEN type = 'Call' THEN volume ELSE 0 END) AS INT) AS call_vol,
+        #     CAST(SUM(CASE WHEN type = 'Put' THEN volume ELSE 0 END) AS INT) AS put_vol,
+        #     CAST(SUM(CASE WHEN type = 'Call' THEN openinterest ELSE 0 END) AS INT) AS call_oi, 
+        #     CAST(SUM(CASE WHEN type = 'Put' THEN openinterest ELSE 0 END) AS INT) AS put_oi,
+        #     CAST(AVG(CASE WHEN type = 'Call' THEN impliedvolatility ELSE 0 END) AS FLOAT) AS call_iv,
+        #     CAST(AVG(CASE WHEN type = 'Put' THEN impliedvolatility ELSE 0 END) AS FLOAT) AS put_iv,
+        #     CAST(AVG(CASE WHEN stk_price / strike BETWEEN 0.95 AND 1.05 THEN impliedvolatility ELSE 0 END) AS FLOAT) AS atm_iv, 
+        #     CAST(AVG(CASE WHEN stk_price / strike NOT BETWEEN 0.95 AND 1.05 THEN impliedvolatility ELSE 0 END) AS FLOAT) AS otm_iv
+        #     FROM {stock}
+        #     GROUP BY date(gatherdate)
+        #     ORDER BY date(gatherdate) ASC
+        #     '''
         q = f'''
             SELECT 
             datetime(gatherdate) AS gatherdate,
