@@ -1,0 +1,9 @@
+2025-05-03 16:22:37,608 - INFO - ClassificationModel initialized with X shape: (800, 3)
+2025-05-03 16:22:37,608 - INFO - Generating time series features
+2025-05-03 16:22:37,610 - ERROR - Error generating time series features: name 'ta' is not defined
+2025-05-03 16:25:34,054 - INFO - ClassificationModel initialized with X shape: (0, 5)
+2025-05-03 16:25:34,055 - INFO - Starting data preprocessing
+2025-05-03 16:25:34,057 - ERROR - Error in data preprocessing: 0
+2025-05-03 16:28:59,648 - INFO - ClassificationModel initialized with X shape: (0, 5)
+2025-05-03 16:28:59,649 - INFO - Starting data preprocessing
+2025-05-03 16:28:59,650 - ERROR - Error in data preprocessing: 0
