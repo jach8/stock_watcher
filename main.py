@@ -121,6 +121,3 @@ if __name__ == "__main__":
 	print(m.Optionsdb._em_ext('gme'))
 	m.performance.show_performance()
 	print(m.cp3.test_import('amzn'))
-
- 
- 

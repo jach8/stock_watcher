@@ -574,6 +574,7 @@ class Prices(UpdateStocks):
             # Create target (next day's close price)
             close_series = mdf["close"].iloc[:, 0] if isinstance(mdf["close"], pd.DataFrame) else mdf["close"]
             mdf["target"] = close_series.pct_change().shift(-1)
+            test_data = mdf.drop(columns = ['close', 'target']).iloc[-1]
             mdf = mdf.dropna()
             
             if mdf.empty:
@@ -585,45 +586,9 @@ class Prices(UpdateStocks):
                 'X': mdf.drop(columns=['close', 'target']),
                 'y': mdf['target'],
                 'features': list(mdf.drop(columns=['close', 'target']).columns),
-                'target': ['target']
+                'target': ['target'],
+                'test_data': test_data
             }
-        except Exception as e:
-            logger.error(f"Failed to prepare data for model: {str(e)}")
-            raise
-
-    def model_test_data(self, stock: str, daily: bool = True, ma: str = 'ema',
-                   start_date: Optional[str] = None, end_date: Optional[str] = None
-                         ) -> Dict[str, Union[str, pd.DataFrame, List[str], pd.Series]]:
-        """
-        Get the Latest Indicators for a stock. No close data is needed since this is for getting predictions from our model. 
-        """
-        if not isinstance(stock, str):
-            raise InvalidParameterError("Stock symbol must be a string")
-        if ma not in ['ema', 'sma', 'kama', 'wma']:
-            raise InvalidParameterError("Moving average type must be 'ema', 'sma', 'kama', or 'wma'")
-
-        try:
-            i = Indicators()
-            df = self.ohlc(stock, daily=daily, start=None, end=None)
-            if df.empty:
-                raise ValueError(f"No data found for stock {stock}")
-
-            mdf = i.all_indicators(df, ma).dropna().drop(columns=['open', 'high', 'low', 'close'])
-            mdf = mdf[start_date:end_date]
-
-            if mdf.empty:
-                raise ValueError(f"No valid data after computing indicators for stock {stock}")
-
-            return {
-                'stock': stock,
-                'df': mdf,
-                'X': mdf,
-                'y': None,
-                'features': list(mdf.columns),
-                'target': ['target']
-
-            }
-
         except Exception as e:
             logger.error(f"Failed to prepare data for model: {str(e)}")
             raise
@@ -760,7 +725,14 @@ if __name__ == "__main__":
      
 
     p = Prices(connections)
-    print(p.get_daily_technicals('amzn', start_date = '2024-08-01' ))
+    # print(p.get_daily_technicals('amzn', start_date = '2024-08-01' ))
+
+    d = p.model_preparation('spy', daily = True, ma = 'kama', start_date = "2023-01-01")
+    for i in d: 
+        try:
+            print(i, d[i].shape)
+        except:
+            print(i, d[i])
 
 
 
