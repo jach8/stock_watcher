@@ -78,7 +78,7 @@ class ClassificationModel:
         if categorical_cols is None and numerical_cols is None:
             self.numerical_cols = self.X.select_dtypes(include=['float64', 'int64']).columns.tolist()
             self.categorical_cols = self.X.select_dtypes(include=['object', 'category']).columns.tolist()
-            self.logger.info("Inferred %d numerical and %d categorical columns", 
+            self.logger.debug("Inferred %d numerical and %d categorical columns", 
                             len(self.numerical_cols), len(self.categorical_cols))
         else:
             self.categorical_cols = categorical_cols if categorical_cols else []
@@ -192,7 +192,7 @@ class ClassificationModel:
                     X_scaled, self.y, test_size=self.test_size, random_state=self.random_state
                 )
                 self.train_index = self.X.index[:len(self.X_train)]
-                self.test_index = self.X.index[len(self.X_train):]
+                
             
             # Prepare PCA data if enabled
             if self.use_pca:
@@ -203,7 +203,7 @@ class ClassificationModel:
                 self.y_train_pca = self.y_train
                 self.y_test_pca = self.y_test
             
-            self.logger.info("Data preprocessing completed. Training set shape: %s", 
+            self.logger.debug("Data preprocessing completed. Training set shape: %s", 
                             str(self.X_train.shape))
             
         except Exception as e:
@@ -239,7 +239,7 @@ class ClassificationModel:
                     X_pca, y_pca, test_size=self.test_size, random_state=self.random_state
                 )
             
-            self.logger.info("PCA data preparation completed with %d components", n_components)
+            self.logger.debug("PCA data preparation completed with %d components", n_components)
             
         except Exception as e:
             self.logger.error("Error in PCA data preparation: %s", str(e))
@@ -255,7 +255,7 @@ class ClassificationModel:
             pd.DataFrame: Predictions from each model
         """
         try:
-            self.logger.info("Predicting on new data with shape: %s", str(X_new.shape))
+            self.logger.debug("Predicting on new data with shape: %s", str(X_new.shape))
             
             if not self.models:
                 raise ValueError("No models have been trained. Call train_models() first.")
@@ -322,7 +322,7 @@ class ClassificationModel:
                     predictions[model_name] = model.predict(X_new_scaled)
             
             pred_df = pd.DataFrame(predictions, index=X_new.index)
-            self.logger.info("Predictions generated for %d samples", len(pred_df))
+            self.logger.debug("Predictions generated for %d samples", len(pred_df))
             self.logger.debug("Predictions: %s", pred_df.head().to_dict())
             
             return pred_df
@@ -381,7 +381,7 @@ class ClassificationModel:
             Dict[str, float]: Dictionary of performance metrics
         """
         try:
-            self.logger.info("Evaluating %s", model_name)
+            self.logger.debug("Evaluating %s", model_name)
             y_pred = model.predict(X_test)
             
             self.model_predictions[model_name] = pd.Series(y_pred, name='predictions', index=self.test_index)
@@ -395,7 +395,7 @@ class ClassificationModel:
             }
             
             self.results.loc[model_name] = metrics
-            self.logger.info("%s evaluation completed. Accuracy: %.3f, F1 Score: %.3f", 
+            self.logger.debug("%s evaluation completed. Accuracy: %.3f, F1 Score: %.3f", 
                             model_name, metrics['Accuracy'], metrics['F1 Score'])
             self.logger.debug("Metrics for %s: %s", model_name, metrics)
             
@@ -436,7 +436,7 @@ class ClassificationModel:
             cv = TimeSeriesSplit(n_splits=5) if self.time_series else StratifiedKFold(n_splits=10, shuffle=True, random_state=self.random_state)
             grid = GridSearchCV(KNeighborsClassifier(), param_grid=param_grid, cv=cv)
             grid.fit(self.X_train, self.y_train)
-            self.logger.info("Best KNN neighbors: %d", grid.best_params_['n_neighbors'])
+            self.logger.debug("Best KNN neighbors: %d", grid.best_params_['n_neighbors'])
             knn = KNeighborsClassifier(n_neighbors=grid.best_params_['n_neighbors'])
             knn.fit(self.X_train, self.y_train)
             self.models['KNN'] = knn
@@ -446,7 +446,7 @@ class ClassificationModel:
             if self.use_pca:
                 self.logger.debug("Training PCA KNN with GridSearch")
                 grid.fit(self.X_train_pca, self.y_train_pca)
-                self.logger.info("Best PCA KNN neighbors: %d", grid.best_params_['n_neighbors'])
+                self.logger.debug("Best PCA KNN neighbors: %d", grid.best_params_['n_neighbors'])
                 knn_pca = KNeighborsClassifier(n_neighbors=grid.best_params_['n_neighbors'])
                 knn_pca.fit(self.X_train_pca, self.y_train_pca)
                 self.models['PCA KNN'] = knn_pca
@@ -466,7 +466,7 @@ class ClassificationModel:
             self.models['Neural Network'] = nn
             self.evaluate_model('Neural Network', nn, self.X_test, self.y_test)
 
-            self.logger.info("All models trained successfully")
+            self.logger.debug("All models trained successfully")
             
         except Exception as e:
             self.logger.error("Error in training models: %s", str(e))
@@ -534,9 +534,9 @@ if __name__ == "__main__":
         print(predictions.head())
         
         # Save results and predictions
-        results.to_csv('stock_model_results.csv')
-        predictions.to_csv('stock_predictions.csv')
-        model.logger.info("Results and predictions saved to CSV files")
+        # results.to_csv('stock_model_results.csv')
+        # predictions.to_csv('stock_predictions.csv')
+        # model.logger.debug("Results and predictions saved to CSV files")
         
     except Exception as e:
         print(f"Main execution failed: {str(e)}")

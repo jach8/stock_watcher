@@ -49,12 +49,16 @@ def encode_orders(predictions, test_index, stock, shares = 100 , thresh = 0.003,
     out['Symbol'] = stock
     out['Shares'] = shares
     
-    # # Close orders after 2 days
-    # closed = out.copy()
-    # closed['Order'] = np.where(closed['Order'] == "BUY", "SELL", np.where(closed['Order'] == "SELL", "BUY", "HOLD"))   
-    # closed.index = closed.index + pd.tseries.offsets.BDay(5)
-    
-    # out = pd.concat([out, closed]).sort_index()
+    # # # Close orders after 2 days
+    # buys = out[out['Order'] == 'BUY'].index
+    # sells = out[out['Order'] == 'SELL'].index
+
+    # closed_buys = [out.index[out.index.get_loc(buy) + 2] for buy in buys]
+    # closed_sells = [out.index[out.index.get_loc(sell) + 2] for sell in sells]
+    # closed_buys = pd.Series(closed_buys, index=buys)
+    # closed_sells = pd.Series(closed_sells, index=sells)
+    # closed = pd.DataFrame(index=closed_buys.append(closed_sells).drop_duplicates())
+    # out = pd.concat([out, closed]).sort_index().drop_duplicates(keep='last')
     if name is None:
         return out[['Symbol', 'Order', 'Shares']]
     else:
