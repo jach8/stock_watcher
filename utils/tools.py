@@ -43,8 +43,11 @@ def encode_orders(predictions, test_index, stock, shares = 100 , thresh = 0.003,
     """
     if predictions.dtype == 'int':
         preds = np.where(predictions == 1, "BUY", np.where(predictions == -1, "SELL", "HOLD"))
+    elif predictions.dtype == 'str':
+        pass
     else:
         preds = np.where(predictions > thresh, "BUY", np.where(predictions < -thresh, "SELL", "HOLD"))
+
     out = pd.DataFrame(preds, index = pd.to_datetime(test_index), columns = ['Order'])
     out['Symbol'] = stock
     out['Shares'] = shares
