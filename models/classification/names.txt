@@ -1,7 +1,0 @@
-LDA
-QDA
-Naive Bayes
-KNN
-PCA KNN
-Logistic Regression
-Neural Network
