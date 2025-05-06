@@ -1,11 +1,17 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
+
+import sys
+from pathlib import Path
 from .clda import ClassificationModel
-from ....stockData import StockData
-from ....main import Manager
-from ...utils.tools import encode_orders, pretty_print
-from ....backtest.strategies import Policy
+sys.path.append(str(Path(__file__).resolve().parents[3]))
+
+from stockData import StockData
+from main import Manager
+from bin.utils.tools import encode_orders, pretty_print
+from backtest.strategies import Policy
 
 
 def get_sd(stock, manager = Manager):
@@ -102,3 +108,11 @@ def main(stock, manager = Manager, policy = Policy):
     return model, res, more_stats
 
 
+def get_order_dict(stock, manager = Manager):
+    # Fit models
+    model = fit_models(stock, manager)
+    models = model.model_predictions
+    # Get orders
+    orders, names = get_orders(models, stock)
+
+    return {x:y for x, y in zip(names, orders)}
