@@ -1,0 +1,105 @@
+           Order Symbol  Shares Name
+date                                
+2024-04-22  HOLD    iwm      10  LDA
+2024-04-23  HOLD    iwm      10  LDA
+2024-04-24  HOLD    iwm      10  LDA
+2024-04-25  HOLD    iwm      10  LDA
+2024-04-26  HOLD    iwm      10  LDA
+...          ...    ...     ...  ...
+2025-04-28  HOLD    iwm      10  LDA
+2025-04-29  HOLD    iwm      10  LDA
+2025-04-30   BUY    iwm      10  LDA
+2025-05-01  HOLD    iwm      10  LDA
+2025-05-02  HOLD    iwm      10  LDA
+
+[250 rows x 4 columns]
+           Order Symbol  Shares Name
+date                                
+2024-04-22   BUY    iwm      10  QDA
+2024-04-23   BUY    iwm      10  QDA
+2024-04-24  HOLD    iwm      10  QDA
+2024-04-25  HOLD    iwm      10  QDA
+2024-04-26   BUY    iwm      10  QDA
+...          ...    ...     ...  ...
+2025-04-28   BUY    iwm      10  QDA
+2025-04-29   BUY    iwm      10  QDA
+2025-04-30  HOLD    iwm      10  QDA
+2025-05-01   BUY    iwm      10  QDA
+2025-05-02  HOLD    iwm      10  QDA
+
+[250 rows x 4 columns]
+           Order Symbol  Shares         Name
+date                                        
+2024-04-22  HOLD    iwm      10  Naive Bayes
+2024-04-23  HOLD    iwm      10  Naive Bayes
+2024-04-24  HOLD    iwm      10  Naive Bayes
+2024-04-25   BUY    iwm      10  Naive Bayes
+2024-04-26  HOLD    iwm      10  Naive Bayes
+...          ...    ...     ...          ...
+2025-04-28  HOLD    iwm      10  Naive Bayes
+2025-04-29  HOLD    iwm      10  Naive Bayes
+2025-04-30   BUY    iwm      10  Naive Bayes
+2025-05-01  HOLD    iwm      10  Naive Bayes
+2025-05-02  HOLD    iwm      10  Naive Bayes
+
+[250 rows x 4 columns]
+           Order Symbol  Shares Name
+date                                
+2024-04-22  HOLD    iwm      10  KNN
+2024-04-23   BUY    iwm      10  KNN
+2024-04-24   BUY    iwm      10  KNN
+2024-04-25   BUY    iwm      10  KNN
+2024-04-26  HOLD    iwm      10  KNN
+...          ...    ...     ...  ...
+2025-04-28  HOLD    iwm      10  KNN
+2025-04-29  HOLD    iwm      10  KNN
+2025-04-30   BUY    iwm      10  KNN
+2025-05-01  HOLD    iwm      10  KNN
+2025-05-02   BUY    iwm      10  KNN
+
+[250 rows x 4 columns]
+           Order Symbol  Shares     Name
+date                                    
+2024-04-22  HOLD    iwm      10  PCA KNN
+2024-04-23   BUY    iwm      10  PCA KNN
+2024-04-24  HOLD    iwm      10  PCA KNN
+2024-04-25   BUY    iwm      10  PCA KNN
+2024-04-26   BUY    iwm      10  PCA KNN
+...          ...    ...     ...      ...
+2025-04-28  HOLD    iwm      10  PCA KNN
+2025-04-29   BUY    iwm      10  PCA KNN
+2025-04-30  HOLD    iwm      10  PCA KNN
+2025-05-01  HOLD    iwm      10  PCA KNN
+2025-05-02   BUY    iwm      10  PCA KNN
+
+[250 rows x 4 columns]
+           Order Symbol  Shares                 Name
+date                                                
+2024-04-22  HOLD    iwm      10  Logistic Regression
+2024-04-23  HOLD    iwm      10  Logistic Regression
+2024-04-24  HOLD    iwm      10  Logistic Regression
+2024-04-25  HOLD    iwm      10  Logistic Regression
+2024-04-26  HOLD    iwm      10  Logistic Regression
+...          ...    ...     ...                  ...
+2025-04-28  HOLD    iwm      10  Logistic Regression
+2025-04-29  HOLD    iwm      10  Logistic Regression
+2025-04-30   BUY    iwm      10  Logistic Regression
+2025-05-01  HOLD    iwm      10  Logistic Regression
+2025-05-02  HOLD    iwm      10  Logistic Regression
+
+[250 rows x 4 columns]
+           Order Symbol  Shares            Name
+date                                           
+2024-04-22   BUY    iwm      10  Neural Network
+2024-04-23   BUY    iwm      10  Neural Network
+2024-04-24  HOLD    iwm      10  Neural Network
+2024-04-25   BUY    iwm      10  Neural Network
+2024-04-26  HOLD    iwm      10  Neural Network
+...          ...    ...     ...             ...
+2025-04-28  HOLD    iwm      10  Neural Network
+2025-04-29  HOLD    iwm      10  Neural Network
+2025-04-30  HOLD    iwm      10  Neural Network
+2025-05-01  HOLD    iwm      10  Neural Network
+2025-05-02   BUY    iwm      10  Neural Network
+
+[250 rows x 4 columns]
