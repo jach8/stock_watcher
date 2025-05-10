@@ -28,3 +28,22 @@ class SarimaxModel:
             seasonal_order=self.seasonal_order,
             trend=self.trend
         )
+
+
+
+if __name__ == "__main__":
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).resolve().parents[3]))
+    from bin.main import get_path
+    from main import Manager 
+    connections = get_path()
+    manager = Manager(connections)
+    close_prices = manager.Pricedb.ohlc('spy')['Close'].to_frame()
+    
+    model = SARIMAX(
+    endog=close_prices,
+    order=(1, 1, 1),
+    seasonal_order=(1, 1, 1, 12),
+    trend='c'
+    ).fit()
