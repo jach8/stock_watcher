@@ -34,15 +34,15 @@ class Dtree():
     def tree_size(self):
         train_x = self.train_x
         train_y = self.train_y
-        tsize = np.arange(10, 100, 1)
+        tsize = np.arange(10, 20, 1)
         # Plot Training error for number of trees on the training data 
         ter = []
-        for j in tqdm(range(5)):
+        for j in tqdm(range(5), desc = "Deciding Tree Size"):
             train_error = []
             for i in tqdm(tsize):
                 rf = RandomForestClassifier(n_estimators=i)
                 rf.fit(train_x, train_y)
-                ada = AdaBoostClassifier(base_estimator=rf, n_estimators=i)
+                ada = AdaBoostClassifier(estimator=rf, n_estimators=i)
                 ada.fit(train_x, train_y)
                 train_error.append(1 - rf.score(train_x, train_y))
             ter.append(train_error)
@@ -58,10 +58,10 @@ class Dtree():
         # Random forest
         ob = []
         te = []
-        for j in tqdm(range(5)):
+        for j in tqdm(range(5), desc = "Selecting Variables"):
             OOB_error = []
             test_error = []
-            for v in tqdm(var_selection):
+            for v in tqdm(var_selection, desc = "Variable Selection"):
                 rf_v = RandomForestClassifier(max_features=v, oob_score=True)
                 rf_v.fit(train_x, train_y)
                 OOB_error.append(1 - rf_v.oob_score_)
@@ -81,7 +81,7 @@ class Dtree():
             'learning_rate' : np.arange(0.1, 1, 0.1)
         }
         rf = RandomForestClassifier(max_features = 8, n_estimators= 37)
-        ada = AdaBoostClassifier(base_estimator=rf)
+        ada = AdaBoostClassifier(estimator=rf)
         cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=1)
         grid_search = GridSearchCV(estimator=ada, param_grid=param_grid, n_jobs=-1, cv=cv, scoring='accuracy',error_score=0)
         print("Fitting Grid Search")
@@ -104,12 +104,12 @@ class Dtree():
         self.tree_size()
         self.var_select()
         rf = RandomForestClassifier(max_features = self.nvar, n_estimators= self.n_trees)
-        ada = AdaBoostClassifier(base_estimator=rf, learning_rate=self.best_lr)
+        ada = AdaBoostClassifier(estimator=rf, learning_rate=self.best_lr)
 
         bap = {}
         rfp = {}
         knp = {}
-        for i in tqdm(range(50)):
+        for i in tqdm(range(10), desc = "Testing Scores"):
             # Fit best model on test data 
             best_ada = self.best_ada
             best_ada.fit(train_x, train_y)
@@ -139,3 +139,43 @@ class Dtree():
             knp['precision'] = precision_score(knn_pred, test_y)
 
         return pd.DataFrame({"AdaBoost": bap, "Random Forest": rfp, "KNN": knp})
+    
+
+    def plot(self):
+        # Plot the results
+        fig, ax = plt.subplots(1, 2, figsize=(12, 6))
+        self.ada_train_results.plot(ax=ax[0], title='AdaBoost Training Error', legend=False)
+        self.var_selection_results.plot(ax=ax[1], title='Variable Selection Error', legend=False)
+        plt.show()
+
+if __name__ == "__main__":
+    import sys 
+    from pathlib import Path 
+
+    sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
+
+    from stockData import StockData
+    from bin.main import get_path 
+    from main import Manager 
+
+    connections = get_path()
+    manager = Manager(connections)
+    # SPY
+
+    sd = StockData(manager = manager, stock= 'spy')
+    x = sd.get_features()
+    y = sd.price_data['close'].pct_change().shift(-1).loc[x.index].dropna()
+    x = x.loc[y.index]
+    y = pd.Series(np.sign(y), index=y.index)
+
+    # Split the data
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+
+
+    # Initialize the model
+    model = Dtree(x_train, y_train, x_test, y_test, target='close')
+    # Fit the model
+    results = model.fit_mod()
+    print(results)
+
+
