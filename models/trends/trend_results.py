@@ -66,7 +66,7 @@ class TResults:
         
         # Initialize data connection
         self.data_manager = Manager(connections)
-        self.stocks = self.data_manager.Pricedb.stocks['all_stocks']
+        self.stocks = self.data_manager.Pricedb.stocks['equities']
         self.trend_analyzer = TrendAnalyzer(period = self.period)
         self.peak_detector = PeakDetector(prominence=0.5, distance = 2)
 
