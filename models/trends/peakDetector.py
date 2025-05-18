@@ -6,7 +6,7 @@ from typing import Dict, Optional, List, Set
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import lru_cache
-from trend_detector import TrendAnalyzer, TimeSeriesData
+from .trend_detector import TrendAnalyzer, TimeSeriesData
 import logging
 
 # Configure logging

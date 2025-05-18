@@ -3,9 +3,6 @@ Module for detecting changes in stock price trends.
 Provides functionality to analyze trends across multiple stocks using the TrendAnalyzer.
 """
 import logging
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).resolve().parents[3]))
 from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict, Any
 import pandas as pd
@@ -17,6 +14,9 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parents[3]))
 from bin.models.trends.trend_detector import TrendAnalyzer
 from bin.models.trends.change_detection import ChangePointDetector
 from bin.models.trends.peakDetector import PeakDetector

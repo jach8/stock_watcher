@@ -5,7 +5,7 @@ from itertools import product
 from pandas import Series, DataFrame
 from statsmodels.tsa.seasonal import seasonal_decompose
 from dataclasses import dataclass
-from trend_detector import TrendAnalyzer
+from .trend_detector import TrendAnalyzer
 
 class ChangePointDetector:
     """A class for detecting change points in time series data with parameter optimization."""
