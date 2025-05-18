@@ -80,7 +80,7 @@ class BondsRepository(BaseRepository):
     def get_latest_yields(self) -> pd.DataFrame:
         """Get latest bond yields."""
         query = (self.query_builder
-                .select(['date', '"2Y"', '"5Y"', '"10Y"', '"30Y"'])
+                .select(['date', '2Y', '5Y', '10Y', '30Y'])  # Removed double quotes
                 .from_table('bond_yields')
                 .order_by(['date'], desc=True)
                 .build())
@@ -89,7 +89,7 @@ class BondsRepository(BaseRepository):
     def get_by_id(self, id: Any) -> Optional[pd.DataFrame]:
         """Get yields by date."""
         query = (self.query_builder
-                .select(['date', '"2Y"', '"5Y"', '"10Y"', '"30Y"'])
+                .select(['date', '2Y', '5Y', '10Y', '30Y'])  # Removed double quotes
                 .from_table('bond_yields')
                 .where({'date': id})
                 .build())

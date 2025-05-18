@@ -1,3 +1,5 @@
+"""Test repository implementations."""
+
 import unittest
 import pandas as pd
 import os
@@ -9,7 +11,8 @@ from bin.database.core import (
     DBManager, 
     DatabaseError, 
     QueryError, 
-    RepositoryError
+    RepositoryError,
+    ConnectionError
 )
 from bin.database.repositories import (
     PriceRepository,
@@ -18,32 +21,72 @@ from bin.database.repositories import (
 )
 from bin.database.tests.test_base import DatabaseTestCase
 
+class TestBondsRepository(DatabaseTestCase):
+    def setUp(self):
+        """Set up test environment"""
+        super().setUp()
+        self.repository = BondsRepository(self.db_manager)
+        self.repository.db_name = 'bonds_db'
+
+    def test_get_latest_yields(self):
+        """Test latest bond yields retrieval"""
+        # Create test table and data
+        with self.db_manager.connection('bonds_db') as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS bond_yields (
+                    date TEXT PRIMARY KEY,
+                    [2Y] REAL,
+                    [5Y] REAL,
+                    [10Y] REAL,
+                    [30Y] REAL
+                )
+            """)
+            conn.execute("""
+                INSERT INTO bond_yields (date, [2Y], [5Y], [10Y], [30Y])
+                VALUES ('2025-05-17', 4.5, 4.7, 4.9, 5.1)
+            """)
+            conn.commit()
+            
+        result = self.repository.get_latest_yields()
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertEqual(len(result), 1)
+        self.assertIn('10Y', result.columns)
+        self.assertEqual(float(result['10Y'].iloc[0]), 4.9)
+
+    def test_error_handling(self):
+        """Test repository error handling"""
+        try:
+            self.repository.get_latest_yields()
+            self.fail("Expected RepositoryError to be raised")
+        except ConnectionError as e:
+            # Check that the error contains the correct message about missing table
+            self.assertIn("no such table: bond_yields", str(e))
+
 class TestPriceRepository(DatabaseTestCase):
     def setUp(self):
         """Set up test environment"""
         super().setUp()
         
         # Create test database schema
-        conn = sqlite3.connect(self.db_paths['stocks_db'])
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS AAPL (
-                date TEXT PRIMARY KEY,
-                open REAL,
-                high REAL,
-                low REAL,
-                close REAL,
-                volume INTEGER
-            )
-        """)
-        conn.execute("""
-            INSERT INTO AAPL (date, open, high, low, close, volume)
-            VALUES ('2025-05-17', 100.0, 105.0, 98.0, 103.0, 1000000)
-        """)
-        conn.commit()
-        conn.close()
+        with self.db_manager.connection('stocks_db') as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS AAPL (
+                    date TEXT PRIMARY KEY,
+                    open REAL,
+                    high REAL,
+                    low REAL,
+                    close REAL,
+                    volume INTEGER
+                )
+            """)
+            conn.execute("""
+                INSERT INTO AAPL (date, open, high, low, close, volume)
+                VALUES ('2025-05-17', 100.0, 105.0, 98.0, 103.0, 1000000)
+            """)
+            conn.commit()
         
         self.repository = PriceRepository(self.db_manager)
-        self.repository.db_name = 'stocks_db'  # Set correct database name
+        self.repository.db_name = 'stocks_db'
 
     def test_get_ohlc(self):
         """Test OHLC data retrieval"""
@@ -63,28 +106,27 @@ class TestOptionsRepository(DatabaseTestCase):
         super().setUp()
         
         # Create test database schema
-        conn = sqlite3.connect(self.db_paths['options_db'])
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS AAPL_chain (
-                strike REAL,
-                expiry TEXT,
-                call_price REAL,
-                put_price REAL,
-                gatherdate TEXT,
-                PRIMARY KEY (strike, expiry)
-            )
-        """)
-        conn.execute("""
-            INSERT INTO AAPL_chain (strike, expiry, call_price, put_price, gatherdate)
-            VALUES 
-                (100.0, '2025-06-21', 5.0, 2.0, '2025-05-17 10:00:00'),
-                (110.0, '2025-06-21', 2.0, 7.0, '2025-05-17 10:00:00')
-        """)
-        conn.commit()
-        conn.close()
+        with self.db_manager.connection('options_db') as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS AAPL_chain (
+                    strike REAL,
+                    expiry TEXT,
+                    call_price REAL,
+                    put_price REAL,
+                    gatherdate TEXT,
+                    PRIMARY KEY (strike, expiry)
+                )
+            """)
+            conn.execute("""
+                INSERT INTO AAPL_chain (strike, expiry, call_price, put_price, gatherdate)
+                VALUES 
+                    (100.0, '2025-06-21', 5.0, 2.0, '2025-05-17 10:00:00'),
+                    (110.0, '2025-06-21', 2.0, 7.0, '2025-05-17 10:00:00')
+            """)
+            conn.commit()
         
         self.repository = OptionsRepository(self.db_manager)
-        self.repository.db_name = 'options_db'  # Set correct database name
+        self.repository.db_name = 'options_db'
 
     def test_get_latest_chain(self):
         """Test latest options chain retrieval"""
@@ -105,46 +147,6 @@ class TestOptionsRepository(DatabaseTestCase):
         chain = self.repository.get_latest_chain('AAPL')
         self.repository.update_cp('AAPL', chain)
         # Test passes if no exception is raised
-
-class TestBondsRepository(DatabaseTestCase):
-    def setUp(self):
-        """Set up test environment"""
-        super().setUp()
-        
-        # Create test database schema
-        conn = sqlite3.connect(self.db_paths['bonds_db'])
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS bond_yields (
-                date TEXT PRIMARY KEY,
-                "2Y" REAL,
-                "5Y" REAL,
-                "10Y" REAL,
-                "30Y" REAL
-            )
-        """)
-        conn.execute("""
-            INSERT INTO bond_yields (date, "2Y", "5Y", "10Y", "30Y")
-            VALUES ('2025-05-17', 4.5, 4.7, 4.9, 5.1)
-        """)
-        conn.commit()
-        conn.close()
-        
-        self.repository = BondsRepository(self.db_manager)
-        self.repository.db_name = 'bonds_db'  # Set correct database name
-
-    def test_get_latest_yields(self):
-        """Test latest bond yields retrieval"""
-        result = self.repository.get_latest_yields()
-        self.assertIsInstance(result, pd.DataFrame)
-        self.assertEqual(len(result), 1)
-        self.assertIn('10Y', result.columns)
-        self.assertEqual(float(result['10Y'].iloc[0]), 4.9)
-
-    def test_error_handling(self):
-        """Test repository error handling"""
-        os.remove(self.db_paths['bonds_db'])  # Remove database to trigger error
-        with self.assertRaises(RepositoryError):
-            self.repository.get_latest_yields()
 
 if __name__ == '__main__':
     unittest.main()

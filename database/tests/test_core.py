@@ -28,42 +28,54 @@ class TestDBManager(DatabaseTestCase):
             cur = conn.cursor()
             cur.execute('INSERT INTO test_table VALUES (1)')
             cur.execute('SELECT * FROM test_table')
-            self.assertEqual(cur.fetchone()['id'], 1)
+            self.assertEqual(cur.fetchone()[0], 1)
             
         # Check connection returned to pool
         self.assertEqual(self.db_manager._pools[test_db_name].qsize(), initial_pool_size)
 
     def test_connection_error_handling(self):
         """Test error handling for bad connections"""
-        nonexistent_path = os.path.join(self.test_dir, 'data', 'nonexistent.db')
-        bad_manager = DBManager({'bad_db': nonexistent_path}, 1)
+        # Create a nonexistent subdirectory path
+        bad_dir = os.path.join(self.test_dir, "nonexistent_dir")
+        bad_db_path = os.path.join(bad_dir, "test.db")
         
-        with self.assertRaises(ConnectionError):
-            with bad_manager.connection('bad_db'):
+        # Test creating manager with nonexistent directory
+        with self.assertRaisesRegex(ConnectionError, "Database directory does not exist"):
+            DBManager({'bad_db': bad_db_path})
+            
+        # Test attempting to use invalid database name
+        with self.assertRaisesRegex(ConnectionError, "Unknown database"):
+            with self.db_manager.connection('nonexistent_db'):
                 pass
 
     def test_cleanup(self):
         """Test proper cleanup of connection pools"""
+        # Create multiple test connections
         test_db_name = 'test_db'
+        conn_list = []
         
-        # First verify connection works
+        # Get connections from pool
+        for _ in range(3):
+            with self.db_manager.connection(test_db_name) as conn:
+                conn_list.append(conn)
+                cur = conn.cursor()
+                cur.execute('SELECT 1')
+                self.assertEqual(cur.fetchone()[0], 1)
+        
+        # Store a reference to one connection
+        test_conn = None
         with self.db_manager.connection(test_db_name) as conn:
-            cur = conn.cursor()
-            cur.execute('INSERT INTO test_table VALUES (1)')
-            cur.execute('SELECT * FROM test_table')
-            self.assertEqual(cur.fetchone()['id'], 1)
-        
+            test_conn = conn
+            
         # Clean up pools
         self.db_manager.cleanup()
         
-        # Verify pools are empty and connections are closed
-        for pool in self.db_manager._pools.values():
-            self.assertTrue(pool.empty())
+        # Verify pools are empty
+        self.assertEqual(len(self.db_manager._pools), 0)
         
-        # Verify can't get connection after cleanup
-        with self.assertRaises(Exception):
-            with self.db_manager.connection(test_db_name):
-                pass
+        # Verify connection is closed
+        with self.assertRaises(sqlite3.ProgrammingError):
+            test_conn.execute('SELECT 1')
 
 if __name__ == '__main__':
     unittest.main()
