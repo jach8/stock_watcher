@@ -11,11 +11,10 @@ from bin.price.db_connect import Prices
 from bin.options.manage_all import Manager as Optionsdb
 from bin.earnings.get_earnings import Earnings 
 from bin.options.stat.cp3 import OptionsDB as vol2db
-from alerts.prices.price_report import perf as performance
+from bin.alerts.price_report import perf as performance
 from bin.alerts.options_alerts import Notifications
-from alerts.main import GenerateTweets
-from alerts.plays.ling import Scanner
-from alerts.plays.dxp import dxp
+from bin.alerts.scanners.ling import Scanner
+# from bin.alerts.scanners.dxp import dxp
 
 
 def get_path(pre=''):
@@ -44,8 +43,6 @@ def get_path(pre=''):
 				'stock_names' : f'{pre}data/stocks/stock_names.db',
                 'stock_info_dict': f'{pre}data/stocks/stock_info.json',
                 'earnings_calendar': f'{pre}data/earnings/earnings_dates_alpha.csv',
-				#### Pictures Path ######
-				'pics': f'{pre}alerts/pics/'
 
 		}
 	return connections
@@ -80,9 +77,8 @@ class Manager:
 		self.Earningsdb = Earnings(connections)
 		self.performance = performance(connections) 
 		self.Notifications = Notifications(connections)
-		self.GenerateTweets = GenerateTweets(connections)
 		self.Scanner = Scanner(connections)
-		self.dxp = dxp(connections)
+		# self.dxp = dxp(connections)
 		self.cp3 = vol2db(connections)
 		
 		# Save the Connection Dict.

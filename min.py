@@ -38,8 +38,6 @@ def get_path(pre=''):
 				'stock_names' : f'{pre}data/stocks/stock_names.db',
                 'stock_info_dict': f'{pre}data/stocks/stock_info.json',
                 'earnings_calendar': f'{pre}data/earnings/earnings_dates_alpha.csv',
-				#### Pictures Path ######
-				'pics': f'{pre}alerts/pics/'
 
 		}
 	return connections
