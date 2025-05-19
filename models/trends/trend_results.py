@@ -1,27 +1,27 @@
-"""
-Module for detecting changes in stock price trends.
-Provides functionality to analyze trends across multiple stocks using the TrendAnalyzer.
-"""
-import logging
+# In trend_results.py
+
 from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict, Any
 import pandas as pd
+import numpy as np  # Added for numerical comparisons
 from tqdm import tqdm
+import logging
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parents[3]))
+
+# Existing imports
+from bin.models.trends.trend_detector import TrendAnalyzer
+from bin.models.trends.change_detection import ChangePointDetector
+from bin.models.trends.peakDetector import PeakDetector
+from bin.main import get_path
+from main import Manager
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
-
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).resolve().parents[3]))
-from bin.models.trends.trend_detector import TrendAnalyzer
-from bin.models.trends.change_detection import ChangePointDetector
-from bin.models.trends.peakDetector import PeakDetector
-from bin.main import get_path
-from main import Manager
 
 @dataclass
 class TrendResult:
@@ -34,7 +34,8 @@ class TrendResult:
     change_point: Optional[float] = None
     valley: Any = None
     peaks: Any = None
-    # Return as a dictionary
+    metric_status: Optional[str] = None  # New field for above/below/at average
+
     def to_dict(self) -> Dict:
         return {
             "stock": self.stock,
@@ -44,47 +45,29 @@ class TrendResult:
             "slope": self.slope,
             "change_point": self.change_point,
             "valley": self.valley,
-            "peaks": self.peaks
+            "peaks": self.peaks,
+            "metric_status": self.metric_status  # Include new field
         }
 
 class TResults:
     """Class for detecting and analyzing changes in stock price trends."""
     
     def __init__(self, connections: Dict|str, lookback_days: int = 90, window_size: int = 30, period: int = 3):
-        """
-        Initialize the TResults.
-    
-        Args:
-            connections: Dictionary of database connections
-            lookback_days: Number of days to look back for trend analysis
-            window_size: Size of the rolling window for trend analysis
-            period: Period for trend analysis
-        """
+        # Unchanged initialization
         self.lookback_days = lookback_days
         self.window_size = window_size
         self.period = period
-        
-        # Initialize data connection
         self.data_manager = Manager(connections)
         self.stocks = self.data_manager.Pricedb.stocks['equities']
-        self.trend_analyzer = TrendAnalyzer(period = self.period)
-        self.peak_detector = PeakDetector(prominence=0.5, distance = 2)
+        self.trend_analyzer = TrendAnalyzer(period=self.period)
+        self.peak_detector = PeakDetector(prominence=0.5, distance=2)
 
     def get_aligned_data(self, stock: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        """
-        Get aligned data for a given stock.
-
-        Args:
-            stock: Stock symbol to analyze
-
-        Returns:
-            Tuple of DataFrames containing aligned stock and option data
-        """
+        # Unchanged
         ohlcv = self.data_manager.Pricedb.ohlc(stock).dropna().tail(self.lookback_days)
         option_db = self.data_manager.Optionsdb.get_daily_option_stats(stock).dropna()
         if ohlcv.empty or option_db.empty:
             raise ValueError(f"No data available for {stock}")
-        
         return ohlcv, option_db
 
     def analyze_single_stock(self, stock: str) -> Optional[List[TrendResult]]:
@@ -101,10 +84,8 @@ class TResults:
             ValueError: If required data is missing or invalid
         """
         try:
-            # Get and validate data
             ohlcv, option_db = self.get_aligned_data(stock)
             
-            # Define metrics to analyze
             metrics = {
                 'close_prices': ohlcv['Close'],
                 'stock_volume': ohlcv['Volume'],
@@ -123,7 +104,6 @@ class TResults:
                 trend_direction, seasonality, slope = self.trend_analyzer.analyze(data)
                 
                 # Configure change point detection
-
                 window_size = self.window_size
                 scale = True
                 period = self.period
@@ -136,19 +116,27 @@ class TResults:
                     window_size=window_size
                 )
                 change_points = signal.get_last_change_point(
-                    # Sensitivity from 0.01, to 0.2, with a step of 0.04
                     sensitivity_range=(0.01, 0.2, 0.04), 
-                    # Threshold from 0.5 to 2, with a step of 0.5
                     threshold_range=(0.5, 2, 0.5),
-                    min_triggers = 4, 
-                    max_triggers = 20
-                    ).Signal
-
+                    min_triggers=4, 
+                    max_triggers=20
+                ).Signal
 
                 peaks = self.peak_detector.find_peaks(data.values)
                 peak_dates = data.index[peaks]
                 valleys = self.peak_detector.find_valleys(data.values)
                 valley_dates = data.index[valleys]
+                
+                # Calculate metric status (above/below/at average)
+                current_value = data.iloc[-1]
+                mean_value = data.rolling(window = self.lookback_days).mean().iloc[-1]
+                tolerance = 0.01 * mean_value  # 1% tolerance for "at" average
+                if current_value > mean_value + tolerance:
+                    metric_status = "above"
+                elif current_value < mean_value - tolerance:
+                    metric_status = "below"
+                else:
+                    metric_status = "at"
                 
                 # Create and store result
                 results.append(
@@ -159,8 +147,9 @@ class TResults:
                         seasonality=seasonality,
                         slope=slope,
                         change_point=change_points,
-                        valley=valley_dates.max(),
-                        peaks=peak_dates.max(),
+                        valley=valley_dates.max() if len(valley_dates) > 0 else None,
+                        peaks=peak_dates.max() if len(peak_dates) > 0 else None,
+                        metric_status=metric_status  # Add metric status
                     )
                 )
             
@@ -183,7 +172,6 @@ class TResults:
         Returns:
             DataFrame containing trend analysis results
         """
-        # Convert to DataFrame
         data = []
         for i in results:
             for result in i:
@@ -196,11 +184,13 @@ class TResults:
                     'change_point': result.change_point, 
                     'last_valley': result.valley,
                     'last_peak': result.peaks,
+                    'metric_status': result.metric_status,  # Add metric status
+                    'slope_discrepancy': (
+                        (result.trend_direction == 'up' and result.slope < 0) or
+                        (result.trend_direction == 'down' and result.slope > 0)
+                    )
                 })
         df = pd.DataFrame(data)
-
-        # Flag slope discrepancies (where trend direction and slope sign don't match)
-        df['slope_discrepancy'] = ((df['trend_direction'] == 'up') & (df['slope'] < 0)) | ((df['trend_direction'] == 'down') & (df['slope'] > 0))
         return df 
 
     def analyze_stocks(self, stocks: Optional[List[str]] = None) -> pd.DataFrame:
@@ -224,22 +214,18 @@ class TResults:
                 results.append(result)
                 pbar.set_postfix({'Success': True})
 
-
-        # Convert results to DataFrame
-        self.result_df = self.__convert_to_dataframe(results)
+        # self.result_df = self.__convert_to_dataframe(results)
+        # return self.result_df  # Return DataFrame instead of raw results
         return results
     
 def main():
     """Example usage of the TResults class."""
     connections = get_path()
     detector = TResults(connections, lookback_days=15)
-    results = detector.analyze_stocks()
+    results_df = detector.analyze_stocks()
     print("\nTrend Analysis Results:")
-    print(results)
-
-    print(detector.result_df)
-    detector.result_df.to_csv("trend_analysis_results.csv", index=False)
-
+    print(results_df)
+    results_df.to_csv("trend_analysis_results.csv", index=False)
 
 if __name__ == "__main__":
     main()
