@@ -1,23 +1,22 @@
-# In trend_results.py
-
 from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict, Any
 import pandas as pd
-import numpy as np  # Added for numerical comparisons
+import numpy as np
 from tqdm import tqdm
 import logging
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 
-# Existing imports
 from bin.models.trends.trend_detector import TrendAnalyzer
 from bin.models.trends.change_detection import ChangePointDetector
 from bin.models.trends.peakDetector import PeakDetector
+from bin.models.trends.voi import VolumeOpenInterestWorksheet
+from bin.models.trends.clf import Classifier, ClassificationLog
+from datetime import datetime
 from bin.main import get_path
 from main import Manager
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -25,7 +24,6 @@ logging.basicConfig(
 
 @dataclass
 class TrendResult:
-    """Container for trend analysis results."""
     stock: str
     name: str
     trend_direction: str
@@ -34,7 +32,8 @@ class TrendResult:
     change_point: Optional[float] = None
     valley: Any = None
     peaks: Any = None
-    metric_status: Optional[str] = None  # New field for above/below/at average
+    metric_status: Optional[str] = None
+    blowoff_flag: bool = False
 
     def to_dict(self) -> Dict:
         return {
@@ -46,14 +45,36 @@ class TrendResult:
             "change_point": self.change_point,
             "valley": self.valley,
             "peaks": self.peaks,
-            "metric_status": self.metric_status  # Include new field
+            "metric_status": self.metric_status,
+            "blowoff_flag": self.blowoff_flag
+        }
+
+@dataclass
+class ResultsWorksheet:
+    worksheets: List[VolumeOpenInterestWorksheet]
+    timestamp: datetime
+    total_bullish: int = None
+    total_bearish: int = None
+
+    def __post_init__(self):
+        self.total_bullish = sum(ws.bullish_signals for ws in self.worksheets)
+        self.total_bearish = sum(ws.bearish_signals for ws in self.worksheets)
+
+    def to_df(self) -> pd.DataFrame:
+        if not self.worksheets:
+            return pd.DataFrame()
+        return pd.concat([ws.to_df() for ws in self.worksheets], ignore_index=True)
+
+    def to_dict(self) -> Dict:
+        return {
+            "timestamp": self.timestamp.isoformat(),
+            "total_bullish": self.total_bullish,
+            "total_bearish": self.total_bearish,
+            "worksheets": [ws.to_df().to_dict(orient='records') for ws in self.worksheets]
         }
 
 class TResults:
-    """Class for detecting and analyzing changes in stock price trends."""
-    
     def __init__(self, connections: Dict|str, lookback_days: int = 90, window_size: int = 30, period: int = 3):
-        # Unchanged initialization
         self.lookback_days = lookback_days
         self.window_size = window_size
         self.period = period
@@ -61,31 +82,20 @@ class TResults:
         self.stocks = self.data_manager.Pricedb.stocks['equities']
         self.trend_analyzer = TrendAnalyzer(period=self.period)
         self.peak_detector = PeakDetector(prominence=0.5, distance=2)
+        self.all_worksheets = []  # Persistent list to store all worksheets
 
     def get_aligned_data(self, stock: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        # Unchanged
-        ohlcv = self.data_manager.Pricedb.ohlc(stock).dropna().tail(self.lookback_days)
+        ohlcv = self.data_manager.Pricedb.ohlc(stock).dropna()
+        ohlcv['close_chng'] = ohlcv['Close'].diff()
+        ohlcv = ohlcv.tail(self.lookback_days)
         option_db = self.data_manager.Optionsdb.get_daily_option_stats(stock).dropna()
         if ohlcv.empty or option_db.empty:
             raise ValueError(f"No data available for {stock}")
         return ohlcv, option_db
 
     def analyze_single_stock(self, stock: str) -> Optional[List[TrendResult]]:
-        """
-        Analyze trends for a single stock across multiple metrics.
-
-        Args:
-            stock: Stock symbol to analyze
-
-        Returns:
-            List of TrendResult objects if analysis successful, None otherwise
-        
-        Raises:
-            ValueError: If required data is missing or invalid
-        """
         try:
             ohlcv, option_db = self.get_aligned_data(stock)
-            
             metrics = {
                 'close_prices': ohlcv['Close'],
                 'stock_volume': ohlcv['Volume'],
@@ -97,94 +107,118 @@ class TResults:
                 'call_volume': option_db['call_vol'],
                 'put_volume': option_db['put_vol'],
             }
-            
+            chng_map = {
+                'close_prices': None,
+                'stock_volume': option_db['total_vol_chng'],
+                'options_volume': option_db['total_vol_chng'],
+                'oi': option_db['total_oi_chng'],
+                'atm_iv': option_db['atm_iv_chng'],
+                'call_oi': option_db['call_oi_chng'],
+                'put_oi': option_db['put_oi_chng'],
+                'call_volume': option_db['call_vol_chng'],
+                'put_volume': option_db['put_vol_chng'],
+            }
             results = []
-            for metric_name, data in metrics.items():
-                # Analyze trends
-                trend_direction, seasonality, slope = self.trend_analyzer.analyze(data)
-                
-                # Configure change point detection
-                window_size = self.window_size
-                scale = True
-                period = self.period
-                
-                # Detect change points
-                signal = ChangePointDetector(
-                    data,
-                    scale=scale,
-                    period=period,
-                    window_size=window_size
-                )
-                change_points = signal.get_last_change_point(
-                    sensitivity_range=(0.01, 0.2, 0.04), 
-                    threshold_range=(0.5, 2, 0.5),
-                    min_triggers=4, 
-                    max_triggers=20
-                ).Signal
+            price_data = ohlcv['Close']
+            price_chng_data = ohlcv['close_chng']
 
+            # Compute PCR volume and OI ratios
+            pcr_vol = option_db['put_vol'] / option_db['call_vol'].replace(0, pd.NA)
+            pcr_vol = pcr_vol.fillna(0.0)
+            pcr_oi = option_db['put_oi'] / option_db['call_oi'].replace(0, pd.NA)
+            pcr_oi = pcr_oi.fillna(0.0)
+
+            # Classify all metrics, including PCRs
+            classification_logs = {}
+            for metric_name, data in metrics.items():
+                classifier = Classifier(
+                    data=data,
+                    open_interest=chng_map.get(metric_name),
+                    lookback=self.lookback_days,
+                    period=self.period,
+                    window_size=self.window_size
+                )
+                category, blowoff, log_entry = classifier.classify(stock, metric_name)
+                classification_logs[metric_name] = log_entry
+
+                trend_direction, seasonality, slope = self.trend_analyzer.analyze(data)
                 peaks = self.peak_detector.find_peaks(data.values)
                 peak_dates = data.index[peaks]
                 valleys = self.peak_detector.find_valleys(data.values)
                 valley_dates = data.index[valleys]
-                
-                # Calculate metric status (above/below/at average)
-                current_value = data.iloc[-1]
-                mean_value = data.rolling(window = self.lookback_days).mean().iloc[-1]
-                tolerance = 0.01 * mean_value  # 1% tolerance for "at" average
-                if current_value > mean_value + tolerance:
-                    metric_status = "above"
-                elif current_value < mean_value - tolerance:
-                    metric_status = "below"
-                else:
-                    metric_status = "at"
-                
-                # Create and store result
-                results.append(
-                    TrendResult(
-                        stock=stock,
-                        name=metric_name,
-                        trend_direction=trend_direction,
-                        seasonality=seasonality,
-                        slope=slope,
-                        change_point=change_points,
-                        valley=valley_dates.max() if len(valley_dates) > 0 else None,
-                        peaks=peak_dates.max() if len(peak_dates) > 0 else None,
-                        metric_status=metric_status  # Add metric status
-                    )
-                )
-            
-            return results
 
-        except ValueError as ve:
-            logging.error(f"Data validation error for {stock}: {str(ve)}")
-            return None
+                results.append(TrendResult(
+                    stock=stock,
+                    name=metric_name,
+                    trend_direction=trend_direction,
+                    seasonality=seasonality,
+                    slope=slope,
+                    change_point=0.0,
+                    valley=valley_dates.max() if len(valley_dates) > 0 else None,
+                    peaks=peak_dates.max() if len(peak_dates) > 0 else None,
+                    metric_status={'Low': 'below', 'Average': 'at', 'High': 'above', 'Blowoff': 'above'}[category],
+                    blowoff_flag=blowoff
+                ))
+
+            # Classify PCRs
+            classifier_pcr_vol = Classifier(
+                data=pcr_vol,
+                lookback=self.lookback_days,
+                period=self.period,
+                window_size=self.window_size
+            )
+            _, _, pcr_vol_log = classifier_pcr_vol.classify(stock, 'pcr_vol')
+            classification_logs['pcr_vol'] = pcr_vol_log
+
+            classifier_pcr_oi = Classifier(
+                data=pcr_oi,
+                lookback=self.lookback_days,
+                period=self.period,
+                window_size=self.window_size
+            )
+            _, _, pcr_oi_log = classifier_pcr_oi.classify(stock, 'pcr_oi')
+            classification_logs['pcr_oi'] = pcr_oi_log
+
+            # Create a single worksheet per stock with all metrics
+            worksheet = VolumeOpenInterestWorksheet(
+                stock=stock,
+                classification_logs=classification_logs,
+                price_data=price_data,
+                price_chng_data=price_chng_data,
+                volume_data=metrics['stock_volume'],
+                volume_chng_data=chng_map['stock_volume'],
+                oi_data=metrics['oi'],
+                oi_chng_data=chng_map['oi'],
+                option_volume_data=metrics['options_volume'],
+                option_volume_chng_data=chng_map['options_volume'],
+                put_volume=option_db['put_vol'],
+                call_volume=option_db['call_vol'],
+                put_oi=option_db['put_oi'],
+                call_oi=option_db['call_oi']
+            )
+            self.all_worksheets.append(worksheet)  # Append to persistent list
+
+            self.results_worksheet = ResultsWorksheet(worksheets=self.all_worksheets, timestamp=datetime.now())
+            return results
         except Exception as e:
-            logging.error(f"Unexpected error analyzing {stock}: {str(e)}")
+            logging.error(f"Error analyzing {stock}: {str(e)}")
             return None
         
     def __convert_to_dataframe(self, results: List[TrendResult]) -> pd.DataFrame:
-        """
-        Convert list of TrendResult objects to a DataFrame.
-
-        Args:
-            results: List of TrendResult objects
-
-        Returns:
-            DataFrame containing trend analysis results
-        """
         data = []
         for i in results:
             for result in i:
                 data.append({
                     'stock': result.stock,
-                    'metric': result.name,
+                    'name': result.name,  # Changed from 'metric' to 'name' to match TrendResult and trend_summary.py
                     'trend_direction': result.trend_direction,
                     'seasonality': result.seasonality,
                     'slope': result.slope,
-                    'change_point': result.change_point, 
+                    'change_point': result.change_point,
                     'last_valley': result.valley,
                     'last_peak': result.peaks,
-                    'metric_status': result.metric_status,  # Add metric status
+                    'metric_status': result.metric_status,
+                    'blowoff_flag': result.blowoff_flag,
                     'slope_discrepancy': (
                         (result.trend_direction == 'up' and result.slope < 0) or
                         (result.trend_direction == 'down' and result.slope > 0)
@@ -193,18 +227,10 @@ class TResults:
         df = pd.DataFrame(data)
         return df 
 
-    def analyze_stocks(self, stocks: Optional[List[str]] = None) -> pd.DataFrame:
-        """
-        Analyze trends for multiple stocks.
-
-        Args:
-            stocks: List of stock symbols to analyze. If None, uses all stocks.
-
-        Returns:
-            DataFrame containing trend analysis results
-        """
+    def analyze_stocks(self, stocks: Optional[List[str]] = None) -> Tuple[pd.DataFrame, ResultsWorksheet]:
         stocks_to_analyze = stocks if stocks is not None else self.stocks
         results = []
+        self.all_worksheets = []  # Reset the list for a new analysis
         
         pbar = tqdm(stocks_to_analyze, desc='Analyzing Stocks')
         for stock in pbar:
@@ -214,18 +240,37 @@ class TResults:
                 results.append(result)
                 pbar.set_postfix({'Success': True})
 
-        # self.result_df = self.__convert_to_dataframe(results)
-        # return self.result_df  # Return DataFrame instead of raw results
-        return results
+        self.result_df = self.__convert_to_dataframe(results)
+        return self.result_df, self.results_worksheet
     
 def main():
     """Example usage of the TResults class."""
+    import json 
     connections = get_path()
+    stocks = json.load(open(connections['ticker_path'], 'r'))['mag8']
     detector = TResults(connections, lookback_days=15)
-    results_df = detector.analyze_stocks()
+    results_df, worksheet = detector.analyze_stocks(stocks=stocks)
     print("\nTrend Analysis Results:")
     print(results_df)
+    print("\nWorksheet Summary:")
+    print(f"Total Bullish Signals: {worksheet.total_bullish}")
+    print(f"Total Bearish Signals: {worksheet.total_bearish}")
+    print("\nWorksheet Details (Cross-Stock Analysis):")
+    worksheet_df = worksheet.to_df()
+    print(worksheet_df)
+    # Adjusted analysis: Stocks with elevated PCR OI (>0.8) and bearish signals
+    print("\nStocks with Elevated PCR OI (>0.8) and Bearish Signals:")
+    high_pcr_oi_bearish = worksheet_df[
+        (worksheet_df['PCR_OI'] > 0.8) & 
+        (worksheet_df['Bearish'])
+    ][['Stock', 'PCR_OI', 'Price_Delta', 'Volume_Category', 'OI_Category']]
+    print(high_pcr_oi_bearish if not high_pcr_oi_bearish.empty else "No stocks meet the criteria.")
+    # Additional analysis: Top 3 stocks by PCR OI
+    print("\nTop 3 Stocks by PCR OI:")
+    top_pcr_oi = worksheet_df.nlargest(3, 'PCR_OI')[['Stock', 'PCR_OI', 'Price_Delta', 'Volume_Category', 'OI_Category']]
+    print(top_pcr_oi)
     results_df.to_csv("trend_analysis_results.csv", index=False)
+    worksheet_df.to_csv("worksheet_results.csv", index=False)
 
 if __name__ == "__main__":
     main()
