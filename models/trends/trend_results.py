@@ -146,6 +146,12 @@ class TResults:
                 peak_dates = data.index[peaks]
                 valleys = self.peak_detector.find_valleys(data.values)
                 valley_dates = data.index[valleys]
+                try:
+                    cp= ChangePointDetector(data, scale = True, period = self.period, window_size = self.window_size)
+                    change_point = cp.get_last_change_point()
+                except Exception as e:
+                    print(f"Error in change point detection for {stock}: {e}")
+                    change_point = 0.0
 
                 results.append(TrendResult(
                     stock=stock,
@@ -153,7 +159,7 @@ class TResults:
                     trend_direction=trend_direction,
                     seasonality=seasonality,
                     slope=slope,
-                    change_point=0.0,
+                    change_point=change_point,
                     valley=valley_dates.max() if len(valley_dates) > 0 else None,
                     peaks=peak_dates.max() if len(peak_dates) > 0 else None,
                     metric_status={'Low': 'below', 'Average': 'at', 'High': 'above', 'Blowoff': 'above'}[category],

@@ -261,7 +261,7 @@ class ChangePointDetector:
             min_triggers=min_triggers,
             max_triggers=max_triggers
         )
-        return result_df.iloc[-1]
+        return result_df.iloc[-1]['Signal']
 
 if __name__ == "__main__":
     
