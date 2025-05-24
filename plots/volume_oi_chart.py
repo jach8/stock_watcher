@@ -1,7 +1,7 @@
 import pandas as pd 
 import numpy as np 
 import matplotlib.pyplot as plt
-from .utils import human_format
+from utils import human_format
 
 
 def price_volume_oi_chart(df, pdf, fig, ax, stock = None, start_date = None, end_date = None):
@@ -66,11 +66,11 @@ def price_volume_oi_chart(df, pdf, fig, ax, stock = None, start_date = None, end
 
     ax[0].legend()
     ax[1].plot(pdf.index, pdf.volume, color = 'green')
-
+    df.total_vol = df.total_vol.bfill().ffill()
     ax[2].plot(df.index, df.total_vol, color = 'orange', alpha = 0.5)
     ax[2].plot(df.total_vol.rolling(20).mean(), color = 'orange', alpha = 0.9)
     ax[2].hlines(y =df.total_vol.quantile(0.95), xmin = df.index[0], xmax = df.index[-1], color = 'blue', linestyle = '--', label = '95% Quantile')
-    
+    df.total_oi = df.total_oi.bfill().ffill()
     ax[3].plot(df.index, df.total_oi, color = 'red', alpha = 0.5)
     ax[3].plot(df.total_oi.rolling(20).mean(), color = 'red', alpha = 0.9)
     ax[3].hlines(y =df.total_oi.quantile(0.95), xmin = df.index[0], xmax = df.index[-1], color = 'blue', linestyle = '--', label = '95% Quantile')
@@ -90,3 +90,35 @@ def price_volume_oi_chart(df, pdf, fig, ax, stock = None, start_date = None, end
     fig.tight_layout()
     fig.autofmt_xdate(rotation = 0 )
     return ax
+
+
+
+if __name__ == '__main__':
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).resolve().parent.parent))
+    from main import Manager 
+    m = Manager()
+
+    from bin.plots.volume_oi_chart import price_volume_oi_chart
+    from bin.utils.tools import pretty_print
+
+    def get_aligned(stock):
+        price_df = m.Pricedb.ohlc(stock)
+        price_df =price_df.copy().sort_index()
+        d = m.Optionsdb.get_daily_option_stats(stock).sort_index()
+        d = d.resample('1D').sum()
+        price_df = price_df.loc[d.index[0]:]
+        d = d.replace(0, np.nan)
+        return price_df, d
+
+    def show_volume_oi(stock, start_date = None, end_date = None):
+        pdf, odf = get_aligned(stock)
+        pdf.columns = [x.lower() for x in pdf.columns]
+        fig, ax = plt.subplots(4, 1, height_ratios=[2, 0.5, 0.5, 0.5], figsize = (10, 10), dpi = 90)
+        price_volume_oi_chart(odf, pdf, fig, ax, stock = stock, start_date=start_date, end_date=end_date)
+        return fig, ax
+    
+
+    show_volume_oi('nvda', start_date = "2025-01-01")
+    plt.show()
