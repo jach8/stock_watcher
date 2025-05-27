@@ -85,10 +85,10 @@ class TResults:
         self.all_worksheets = []  # Persistent list to store all worksheets
 
     def get_aligned_data(self, stock: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        ohlcv = self.data_manager.Pricedb.ohlc(stock).dropna()
+        ohlcv = self.data_manager.Pricedb.ohlc(stock).dropna().sort_index()
         ohlcv['close_chng'] = ohlcv['Close'].diff()
         ohlcv = ohlcv.tail(self.lookback_days)
-        option_db = self.data_manager.Optionsdb.get_daily_option_stats(stock).dropna()
+        option_db = self.data_manager.Optionsdb.get_daily_option_stats(stock).dropna().sort_index()
         if ohlcv.empty or option_db.empty:
             raise ValueError(f"No data available for {stock}")
         return ohlcv, option_db

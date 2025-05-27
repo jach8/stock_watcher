@@ -1,7 +1,7 @@
 import pandas as pd 
 import numpy as np 
 import matplotlib.pyplot as plt
-from utils import human_format
+from .utils import human_format
 
 
 def price_volume_oi_chart(df, pdf, fig, ax, stock = None, start_date = None, end_date = None):
