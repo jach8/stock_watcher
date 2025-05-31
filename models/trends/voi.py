@@ -22,6 +22,11 @@ class WorksheetEntry:
     option_volume_category: str
     pcr_vol_category: str
     pcr_oi_category: str
+    #### Need to figure out how to incorporate these from the TrendResults class 
+    price_trend_direction: Optional[str] = None
+    volume_trend_direction: Optional[str] = None
+    oi_trend_direction: Optional[str] = None
+    option_volume_trend_direction: Optional[str] = None
 
 @dataclass
 class VolumeOpenInterestWorksheet:
