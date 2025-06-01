@@ -1,3 +1,5 @@
+# voi.py
+
 from dataclasses import dataclass
 from datetime import datetime
 import pandas as pd
@@ -22,11 +24,10 @@ class WorksheetEntry:
     option_volume_category: str
     pcr_vol_category: str
     pcr_oi_category: str
-    #### Need to figure out how to incorporate these from the TrendResults class 
-    price_trend_direction: Optional[str] = None
-    volume_trend_direction: Optional[str] = None
-    oi_trend_direction: Optional[str] = None
-    option_volume_trend_direction: Optional[str] = None
+    price_trend_direction: str  # New field
+    volume_trend_direction: str  # New field
+    oi_trend_direction: str      # New field
+    option_volume_trend_direction: str  # New field
 
 @dataclass
 class VolumeOpenInterestWorksheet:
@@ -39,7 +40,7 @@ class VolumeOpenInterestWorksheet:
     def __init__(
         self,
         stock: str,
-        classification_logs: dict,  # Dict of metric name to ClassificationLog
+        classification_logs: dict,
         price_data: pd.Series,
         price_chng_data: pd.Series,
         volume_data: pd.Series,
@@ -51,7 +52,8 @@ class VolumeOpenInterestWorksheet:
         put_volume: pd.Series,
         call_volume: pd.Series,
         put_oi: pd.Series,
-        call_oi: pd.Series
+        call_oi: pd.Series,
+        trend_directions: dict  # New parameter to pass trend directions
     ):
         self.stock = stock
         self.date = datetime.now()
@@ -112,10 +114,14 @@ class VolumeOpenInterestWorksheet:
                 oi_category=oi_category,
                 option_volume_category=option_volume_category,
                 pcr_vol_category=pcr_vol_category,
-                pcr_oi_category=pcr_oi_category
+                pcr_oi_category=pcr_oi_category,
+                price_trend_direction=trend_directions.get('close_prices', 'unknown'),
+                volume_trend_direction=trend_directions.get('stock_volume', 'unknown'),
+                oi_trend_direction=trend_directions.get('oi', 'unknown'),
+                option_volume_trend_direction=trend_directions.get('options_volume', 'unknown')
             ))
 
-        # Compute bullish/bearish signals for the last row (based on stock_volume and oi)
+        # Compute bullish/bearish signals for the last row
         entry = self.entries[0]
         self.bullish_signals = 1 if (
             entry.price_delta > 0 and 
@@ -149,6 +155,10 @@ class VolumeOpenInterestWorksheet:
                 'Option_Volume_Category': entry.option_volume_category,
                 'PCR_Vol_Category': entry.pcr_vol_category,
                 'PCR_OI_Category': entry.pcr_oi_category,
+                'Price_Trend_Direction': entry.price_trend_direction,  # New field
+                'Volume_Trend_Direction': entry.volume_trend_direction,  # New field
+                'OI_Trend_Direction': entry.oi_trend_direction,  # New field
+                'Option_Volume_Trend_Direction': entry.option_volume_trend_direction,  # New field
                 'Bullish': self.bullish_signals > 0,
                 'Bearish': self.bearish_signals > 0
             })

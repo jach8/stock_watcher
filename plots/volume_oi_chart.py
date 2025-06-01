@@ -17,6 +17,8 @@ def price_volume_oi_chart(df, pdf, fig, ax, stock = None, start_date = None, end
 
     # Align the dataframes
     # pdf = pdf.loc[df.index]
+    if 'total_vol_oi' not in df.columns:
+        df['total_vol_oi'] = df['total_vol'] + df['total_oi']
 
     # High Option Volume days
     high_option_vol_days = df[df.total_vol > df.total_vol.quantile(0.95)]
@@ -66,6 +68,8 @@ def price_volume_oi_chart(df, pdf, fig, ax, stock = None, start_date = None, end
 
     ax[0].legend()
     ax[1].plot(pdf.index, pdf.volume, color = 'green')
+    df.total_vol_oi = df.total_vol_oi.bfill().ffill()
+    ax[1].plot(df.index, df.total_vol_oi, color = 'purple', label = 'All Contracts')
     df.total_vol = df.total_vol.bfill().ffill()
     ax[2].plot(df.index, df.total_vol, color = 'orange', alpha = 0.5)
     ax[2].plot(df.total_vol.rolling(20).mean(), color = 'orange', alpha = 0.9)

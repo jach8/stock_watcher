@@ -98,7 +98,7 @@ class TResults:
         if ohlcv.empty or option_db.empty:
             raise ValueError(f"No data available for {stock}")
         return ohlcv, option_db
-
+    
     def analyze_single_stock(self, stock: str) -> Optional[List[TrendResult]]:
         try:
             ohlcv, option_db = self.get_aligned_data(stock)
@@ -124,6 +124,7 @@ class TResults:
                 'call_volume': option_db['call_vol_chng'],
                 'put_volume': option_db['put_vol_chng'],
             }
+
             results = []
             price_data = ohlcv['Close']
             price_chng_data = ohlcv['close_chng']
@@ -133,6 +134,9 @@ class TResults:
             pcr_vol = pcr_vol.fillna(0.0)
             pcr_oi = option_db['put_oi'] / option_db['call_oi'].replace(0, pd.NA)
             pcr_oi = pcr_oi.fillna(0.0)
+
+            # Store trend directions for relevant metrics
+            trend_directions = {}
 
             # Classify all metrics, including PCRs
             classification_logs = {}
@@ -148,18 +152,22 @@ class TResults:
                 classification_logs[metric_name] = log_entry
 
                 trend_direction, seasonality, slope = self.trend_analyzer.analyze(data)
+                # Store trend direction for relevant metrics
+                if metric_name in ['close_prices', 'stock_volume', 'oi', 'options_volume']:
+                    trend_directions[metric_name] = trend_direction
+
                 peaks = self.peak_detector.find_peaks(data.values)
                 peak_dates = data.index[peaks]
                 valleys = self.peak_detector.find_valleys(data.values)
                 valley_dates = data.index[valleys]
                 try:
-                    cp= ChangePointDetector(data, scale = True, period = self.period, window_size = self.window_size)
+                    cp = ChangePointDetector(data, scale=True, period=self.period, window_size=self.window_size)
                     change_point = cp.get_last_change_point()
                 except Exception as e:
                     print(f"Error in change point detection for {stock}: {e}")
                     change_point = 0.0
 
-                results.append(TrendResult(
+                trend_results = TrendResult(
                     stock=stock,
                     name=metric_name,
                     trend_direction=trend_direction,
@@ -170,7 +178,9 @@ class TResults:
                     peaks=peak_dates.max() if len(peak_dates) > 0 else None,
                     metric_status={'Low': 'below', 'Average': 'at', 'High': 'above', 'Blowoff': 'above'}[category],
                     blowoff_flag=blowoff
-                ))
+                )
+                ### End Loop appending TrendResults. 
+                results.append(trend_results)
 
             # Classify PCRs
             classifier_pcr_vol = Classifier(
@@ -206,7 +216,8 @@ class TResults:
                 put_volume=option_db['put_vol'],
                 call_volume=option_db['call_vol'],
                 put_oi=option_db['put_oi'],
-                call_oi=option_db['call_oi']
+                call_oi=option_db['call_oi'],
+                trend_directions=trend_directions  # Pass the trend directions
             )
             self.all_worksheets.append(worksheet)  # Append to persistent list
 

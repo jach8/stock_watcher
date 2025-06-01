@@ -7,6 +7,7 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 from dataclasses import dataclass
 from .trend_detector import TrendAnalyzer
 
+
 class ChangePointDetector:
     """A class for detecting change points in time series data with parameter optimization."""
     
@@ -253,7 +254,7 @@ class ChangePointDetector:
         threshold_range: Tuple[float, float, float] = (0.1, 2.0, 0.1),
         min_triggers: int = 5,
         max_triggers: int = 10
-        ) -> DataFrame:
+        ) -> int:
         """Get the last detected change point."""
         _, result_df = self.optimize_parameters(
             sensitivity_range=sensitivity_range,
@@ -261,7 +262,7 @@ class ChangePointDetector:
             min_triggers=min_triggers,
             max_triggers=max_triggers
         )
-        return result_df.iloc[-1]['Signal']
+        return int(result_df.iloc[-1]['Signal'])
 
 if __name__ == "__main__":
     
@@ -297,3 +298,7 @@ if __name__ == "__main__":
     print("\nOptimized Parameters:")
     print(f"Best Parameters: {best_params}")
     print(f"Triggers: {best_result_df['Signal'].sum()}")
+
+    # Last change point
+    last_change_point = detector.get_last_change_point()
+    print(f"Last Change Point: {last_change_point}")
