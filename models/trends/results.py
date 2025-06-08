@@ -1,15 +1,12 @@
-
-
-
-
-
-
 from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict, Any
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
 import logging
+from pandas_market_calendars import get_calendar
+
+
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[3]))
@@ -17,7 +14,7 @@ sys.path.append(str(Path(__file__).resolve().parents[3]))
 from bin.models.trends.trend_detector import TrendAnalyzer
 from bin.models.trends.change_detection import ChangePointDetector
 from bin.models.trends.peakDetector import PeakDetector
-from bin.models.trends.voi import VolumeOpenInterestWorksheet
+from bin.models.trends.result_signals import VolumeOpenInterestWorksheet
 from bin.models.trends.clf import Classifier, ClassificationLog
 from datetime import datetime
 from bin.main import get_path
@@ -85,7 +82,7 @@ class TResults:
         self.window_size = window_size
         self.period = period
         self.data_manager = Manager(connections)
-        self.stocks = self.data_manager.Pricedb.stocks['equities']
+        self.stocks = self.data_manager.Pricedb.stocks['mag8']
         self.trend_analyzer = TrendAnalyzer(period=self.period)
         self.peak_detector = PeakDetector(prominence=0.5, distance=2)
         self.all_worksheets = []  # Persistent list to store all worksheets
@@ -98,6 +95,16 @@ class TResults:
         option_db = self.data_manager.Optionsdb.get_daily_option_stats(stock).dropna().sort_index()
         if ohlcv.empty or option_db.empty:
             raise ValueError(f"No data available for {stock}")
+        
+        # Event dates
+        event_dates = get_calendar('NYSE').holidays().holidays
+        ohlcv = ohlcv[~ohlcv.index.isin(event_dates)]
+        option_db = option_db[~option_db.index.isin(event_dates)]
+
+        back_test_date = '2025-03-01'  # Example back-test date
+        ohlcv = ohlcv[ohlcv.index <= back_test_date]
+        option_db = option_db[option_db.index <= back_test_date]
+
         return ohlcv, option_db
     
     def analyze_single_stock(self, stock: str) -> Optional[List[TrendResult]]:
@@ -157,7 +164,7 @@ class TResults:
 
                 trend_direction, seasonality, slope = self.trend_analyzer.analyze(data)
                 # Store trend direction for relevant metrics
-                if metric_name in ['close_prices', 'stock_volume', 'oi', 'options_volume']:
+                if metric_name in ['close_prices', 'stock_volume', 'oi', 'options_volume', 'returns']:
                     trend_directions[metric_name] = trend_direction
 
                 peaks = self.peak_detector.find_peaks(data.values)
@@ -211,6 +218,7 @@ class TResults:
                 classification_logs=classification_logs,
                 price_data=price_data,
                 price_chng_data=price_chng_data,
+                returns_data=returns_data,
                 volume_data=metrics['stock_volume'],
                 volume_chng_data=chng_map['stock_volume'],
                 oi_data=metrics['oi'],
@@ -274,35 +282,27 @@ def main():
     """Example usage of the TResults class."""
     import json 
     connections = get_path()
-    stocks = json.load(open(connections['ticker_path'], 'r'))['mag8']
+    stocks = json.load(open(connections['ticker_path'], 'r'))['all_stocks']
     detector = TResults(connections, lookback_days=500)
     results_df, worksheet = detector.analyze_stocks(stocks=stocks)
+    wdf = worksheet.to_df()
     print("\nTrend Analysis Results:")
     print(results_df)
     print("\nWorksheet Summary:")
     print(f"Total Bullish Signals: {worksheet.total_bullish}")
+    print(wdf[wdf.Bullish == True])
     print(f"Total Bearish Signals: {worksheet.total_bearish}")
-    print("\nWorksheet Details (Cross-Stock Analysis):")
-    wdf = worksheet.to_df()
-    print("Bullish Stocks:")
-    print(wdf[wdf.Bullish == True] if not wdf[wdf.Bullish == True].empty else "No Bullish Stocks")
-    print("Bearish Stocks:")
     print(wdf[wdf.Bearish == True])
-    print("\nWorksheet DataFrame:")
+    print("\nWorksheet Details (Cross-Stock Analysis):")
     print(wdf)
-    cols = [
-    'Price_Trend_Direction',
-    'Volume_Category',
-    'Volume_Trend_Direction',
-    'OI_Category',
-    'OI_Trend_Direction',
-    'Option_Volume_Category',
-    'Option_Volume_Trend_Direction',
-    "Bullish",
-    "Bearish",
-    ]
-    print(wdf[cols])
-
+    cols = ['Stock', 'PCR_OI', 'Price_Delta', 'Volume_Category', 'OI_Category']
+    # Adjusted analysis: Stocks with elevated PCR OI (>1.0) and bearish signals
+    print("\nStocks with Elevated PCR OI (>1.0) and Bearish Signals:")
+    high_pcr_oi_bearish = wdf[(wdf['PCR_OI'] > 1) & (wdf['Bearish'])][cols]
+    print(high_pcr_oi_bearish if not high_pcr_oi_bearish.empty else "No stocks meet the criteria.")
+    # Additional analysis: Top 3 stocks by PCR OI
+    results_df.to_csv("trend_analysis_results.csv", index=False)
+    wdf.to_csv("worksheet_results.csv", index=False)
 
 if __name__ == "__main__":
     main()

@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Union, Optional, Tuple, List
 import pandas as pd
 import numpy as np
-from pandas_market_calendars import get_calendar
 from sklearn.cluster import KMeans
 from datetime import datetime
 
@@ -36,7 +35,6 @@ class Classifier:
         self.data = data if isinstance(data, pd.Series) else data.iloc[:, 0]
         self.open_interest = open_interest
         self.lookback = lookback
-        self.event_dates = event_dates or get_calendar('NYSE').holidays().holidays
         self.blowoff_percentile = blowoff_percentile
         self.category_balance = category_balance
         self.period = period
@@ -45,7 +43,7 @@ class Classifier:
         self.last_evaluation = None
 
     def classify(self, stock: str, metric: str) -> Tuple[str, bool, ClassificationLog]:
-        valid_data = self.data[~self.data.index.isin(self.event_dates)].tail(self.lookback)
+        valid_data = self.data.tail(self.lookback)
         oi_factor = 1.0
         if self.open_interest is not None:
             oi_trend = np.polyfit(np.arange(len(self.open_interest)), self.open_interest, 1)[0]
