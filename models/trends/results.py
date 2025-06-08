@@ -86,11 +86,15 @@ class TResults:
         self.trend_analyzer = TrendAnalyzer(period=self.period)
         self.peak_detector = PeakDetector(prominence=0.5, distance=2)
         self.all_worksheets = []  # Persistent list to store all worksheets
+        self.returns_df = []  # DataFrame to store returns data
 
     def get_aligned_data(self, stock: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
         ohlcv = self.data_manager.Pricedb.ohlc(stock).dropna().sort_index()
         ohlcv['close_chng'] = ohlcv['Close'].diff()
         ohlcv['returns'] = ohlcv['Close'].pct_change()
+        returns_df = ohlcv['returns'].dropna().to_frame(name='returns')
+
+
         ohlcv = ohlcv.tail(self.lookback_days)
         option_db = self.data_manager.Optionsdb.get_daily_option_stats(stock).dropna().sort_index()
         if ohlcv.empty or option_db.empty:
@@ -102,6 +106,17 @@ class TResults:
         option_db = option_db[~option_db.index.isin(event_dates)]
 
         back_test_date = '2025-03-01'  # Example back-test date
+        d = ohlcv[['Close']][back_test_date:]
+        d['stock'] = stock
+        d['Returns'] = d['Close'].pct_change()
+        d['1d'] = d['Returns'].cumsum().shift(-1)
+        d['2d'] = d['Returns'].cumsum().shift(-2)
+        d['3d'] = d['Returns'].cumsum().shift(-3)
+        self.returns_df.append(d.iloc[1].to_frame().T)
+
+
+
+
         ohlcv = ohlcv[ohlcv.index <= back_test_date]
         option_db = option_db[option_db.index <= back_test_date]
 
@@ -283,7 +298,7 @@ def main():
     import json 
     connections = get_path()
     stocks = json.load(open(connections['ticker_path'], 'r'))['all_stocks']
-    detector = TResults(connections, lookback_days=500)
+    detector = TResults(connections, lookback_days=150)
     results_df, worksheet = detector.analyze_stocks(stocks=stocks)
     wdf = worksheet.to_df()
     print("\nTrend Analysis Results:")
@@ -303,6 +318,9 @@ def main():
     # Additional analysis: Top 3 stocks by PCR OI
     results_df.to_csv("trend_analysis_results.csv", index=False)
     wdf.to_csv("worksheet_results.csv", index=False)
+    rdf = pd.concat(detector.returns_df)
+    print(rdf)
+    rdf.to_csv("returns_data.csv", index=True)
 
 if __name__ == "__main__":
     main()
