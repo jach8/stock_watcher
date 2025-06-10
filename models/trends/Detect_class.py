@@ -66,7 +66,7 @@ class Classifier:
 
         # Log
         log_entry = ClassificationLog(
-            date=datetime.now(),
+            date=self.data.index[-1],
             stock=stock,
             metric=metric,
             lookback=self.lookback,

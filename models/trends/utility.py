@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Tuple, Optional, Dict, Any
 import pandas as pd
 import numpy as np
@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 class TrendUtility:
     """Utility for analyzing trends in stock data across multiple periods."""
     periods_config: Dict[str, Dict] = None
+    classification_logs: list = field(default_factory=list)
 
     def __post_init__(self):
         """Initialize trend analyzers for each configured period."""
@@ -227,12 +228,13 @@ class TrendUtility:
                                 period=config['analyzer_period'],
                                 window_size=config['window_size']
                             )
-                            category, blowoff, _ = classifier.classify(stock, metric_name)
+                            category, blowoff, classification_log = classifier.classify(stock, metric_name)
                             peak_data = peak_detection.get_peak_data(data)
                             peaks = peak_data.peak_values
                             valleys = peak_data.valley_values
                             change_points = peak_data.changepoint_values
                             data_value = data_filled.iloc[-1] if not data_filled.empty else None
+                            self.classification_logs.append(classification_log)
 
                             period_results[metric_name] = {
                                 'value': data_value,
