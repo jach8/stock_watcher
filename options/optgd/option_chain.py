@@ -1,8 +1,10 @@
 import sys
-sys.path.append('/Users/jerald/Documents/Dir/Python/Stocks')
+from pathlib import Path 
+sys.path.append(str(Path(__file__).resolve().parents[3]))
 
 from bin.options.optgd.db_connect import Connector
-
+import re 
+import datetime as dt
 import pandas as pd 
 import numpy as np 
 import yfinance as yf 
@@ -32,11 +34,34 @@ class OptionChain(Connector):
         super().__init__(connections)
         self.date_db = sql.connect(connections['dates_db'])
         # logger.info('Option Chain Module Initialized')
+
+    def describe_option(self, y):
+        ''' Given an option contract symbol, using regular expressions to return the stock, expiration date, contract type, and strike price. '''
+        valid = re.compile(r'(?P<stock>[A-Z]+)(?P<expiry>[0-9]+)(?P<type>[C|P])(?P<strike>[0-9]+)')
+        stock = valid.match(y).group('stock')
+        expiration = dt.datetime.strptime(valid.match(y).group('expiry'), "%y%m%d")
+        conttype = valid.match(y).group('type')
+        strike = float(valid.match(y).group('strike')) / 1000
+        return (stock, conttype, float(strike), expiration.strftime('%Y-%m-%d'))
+
+    def describe_option_chain(self, df):
+        ''' Given an option chain, return a description of the options. '''
+        symbols = df['contractSymbol'].to_list()
+        descriptions = [self.describe_option(x) for x in symbols]
+        df['stock'] = [x[0] for x in descriptions]
+        df['type'] = [x[1] for x in descriptions]
+        df['strike'] = [x[2] for x in descriptions]
+        df['expiry'] = [x[3] for x in descriptions]
+        callPut_map = {'C': 'Call', 'P': 'Put'}
+        df['type'] = df['type'].map(callPut_map)
+        return df
+
         
         
     def get_option_chain(self, stock:str) -> pd.DataFrame:
         """ 
         Gets the option chain from Yahoo Finance for a stock. 
+        Update 06/10/2025: Now we can just get the calls and puts directly, without having to parse the expiration dates. 
         
         Args: 
             stock (str): Stock symbol.
@@ -53,9 +78,9 @@ class OptionChain(Connector):
             
             exps = tk.options
             option_list = []
-            for exp in exps: 
-                chain = tk.option_chain(exp)
-                puts, calls = chain.puts, chain.calls
+            for exp in exps:
+                puts = tk.option_chain(exp).puts
+                calls = tk.option_chain(exp).calls
                 puts['type'] = 'Put'
                 calls['type'] = 'Call'
                 opt = pd.concat([puts, calls])
@@ -77,7 +102,7 @@ class OptionChain(Connector):
                 # options = bs_df(options)
                 return options
         except Exception as e:
-            logger.error(f'STOCK: {stock.upper()} Error: {e}')
+            logger.error(f'Error Getting Option Chain: {stock.upper()} Error: {e}')
             return None
         
     def _check_for_stock_in_option_db(self, stock:str) -> bool:
@@ -207,7 +232,7 @@ if __name__ == "__main__":
     connections = get_path()
     start_time = time.time()
     oc = OptionChain(connections)
-    oc.insert_new_chain('spy')
+    print(oc.get_option_chain('intc'))
     end_time = time.time()
     print(f'\n\nTime: {end_time - start_time}')
     oc.close_connections()

@@ -55,10 +55,6 @@ class Manager(OptionChain, Stats):
         else:
             print('Exiting')
     
-    def _delete_option_greeks(self):
-        for stock in tqdm(self.stocks['all_stocks'][1:]):
-            self._delete_option_greeks_from_option_db(stock)
-    
     def _test_import(self):
         print('Imported')  
         print(self.__dict__) 

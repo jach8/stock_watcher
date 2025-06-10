@@ -201,6 +201,7 @@ def main():
     lodf = []; lowdf = []
     for stock in tqdm(stocks, desc="Analyzing Stocks"):
         try:
+            # trend_results = detector.analyze_stock_trend(stock, backtest_date="2025-06-06")
             trend_results = detector.analyze_stock_trend(stock)
             if not trend_results:
                 logger.warning(f"No trend results for {stock}")
