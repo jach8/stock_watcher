@@ -20,6 +20,28 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 @dataclass
+class StockData:
+    """Data container for stock price, option, and returns data."""
+    ohlcv: pd.DataFrame
+    option_df: pd.DataFrame
+    returns: pd.DataFrame
+    stock: str
+    backtest_date: Optional[datetime] = None
+
+    def __post_init__(self):
+        """Validate and preprocess the data."""
+        if not isinstance(self.ohlcv, pd.DataFrame) or not isinstance(self.option_df, pd.DataFrame) or not isinstance(self.returns, pd.DataFrame):
+            raise TypeError("ohlcv, option_df, and returns must be pandas DataFrames")
+        if self.ohlcv.empty or self.option_df.empty:
+            raise ValueError(f"ohlcv or option_df DataFrame is empty for {self.stock}")
+        if not self.ohlcv.index.equals(self.option_df.index):
+            logger.error(f"Index misalignment between ohlcv and option_df for {self.stock}. OHLCV index: {self.ohlcv.index[:5]}, Option index: {self.option_df.index[:5]}")
+            raise ValueError(f"Index misalignment for {self.stock}")
+        if self.ohlcv.index.has_duplicates or self.option_df.index.has_duplicates:
+            logger.error(f"Duplicate indices detected in ohlcv or option_df for {self.stock}")
+            raise ValueError(f"Duplicate indices in data for {self.stock}")
+
+@dataclass
 class DataUtility:
     def __init__(self, connections: Dict | str):
         """
@@ -58,7 +80,6 @@ class DataUtility:
                 valid_date = ohlcv[ohlcv.index <= backtest_date].index[-1] if not ohlcv[ohlcv.index <= backtest_date].empty else None
                 if valid_date is None:
                     raise ValueError(f"No valid trading day found before {backtest_date}")
-                logger.info(f"Adjusted backtest date from {backtest_date} to {valid_date}")
                 backtest_date = valid_date
             return backtest_date
         except Exception as e:
@@ -80,17 +101,19 @@ class DataUtility:
         """
         try:
             ohlcv = self.data_manager.Pricedb.ohlc(stock).sort_index()
-            logger.info(f"Fetched {len(ohlcv)} rows of OHLCV data for {stock}")
             if ohlcv.empty:
                 raise ValueError(f"No price data available for {stock}")
             required_cols = ['Close', 'Volume']
             if not all(col in ohlcv.columns for col in required_cols):
                 raise ValueError(f"Missing required columns {required_cols} in OHLCV data for {stock}")
 
+            # Remove duplicate index entries, keeping the last
+            if ohlcv.index.has_duplicates:
+                ohlcv = ohlcv[~ohlcv.index.duplicated(keep='last')]
+
             ohlcv = ohlcv[required_cols].copy()
-            ohlcv['returns'] = ohlcv['Close'].pct_change()
-            ohlcv = ohlcv[~ohlcv.index.isin(self.event_dates)].dropna()
-            logger.info(f"After filtering holidays and NaNs, {len(ohlcv)} rows remain for {stock}")
+            ohlcv['Returns'] = ohlcv['Close'].pct_change()
+            ohlcv = ohlcv[~ohlcv.index.isin(self.event_dates)]
             return ohlcv.sort_index()
         except Exception as e:
             logger.error(f"Error formatting price data for {stock}: {str(e)}")
@@ -110,64 +133,81 @@ class DataUtility:
             ValueError: If no data is available or required columns are missing.
         """
         try:
-            option_db = self.data_manager.Optionsdb.get_daily_option_stats(stock).sort_index()
-            logger.info(f"Fetched {len(option_db)} rows of option data for {stock}")
-            if option_db.empty:
+            option_df = self.data_manager.Optionsdb.get_daily_option_stats(stock).sort_index()
+            if option_df.empty:
                 raise ValueError(f"No option data available for {stock}")
             required_cols = ['total_vol', 'total_oi', 'call_vol', 'put_vol', 'call_oi', 'put_oi', 'atm_iv']
-            if not all(col in option_db.columns for col in required_cols):
+            if not all(col in option_df.columns for col in required_cols):
                 raise ValueError(f"Missing required columns {required_cols} in option data for {stock}")
 
-            option_db = option_db[required_cols].copy()
-            option_db['pcr_vol'] = option_db['put_vol'] / option_db['call_vol'].replace(0, np.nan).fillna(0.0)
-            option_db['pcr_oi'] = option_db['put_oi'] / option_db['call_oi'].replace(0, np.nan).fillna(0.0)
-            option_db = option_db[~option_db.index.isin(self.event_dates)].dropna()
-            logger.info(f"After filtering holidays and NaNs, {len(option_db)} rows remain for {stock}")
-            return option_db.sort_index()
+            # Remove duplicate index entries, keeping the last
+            if option_df.index.has_duplicates:
+                option_df = option_df[~option_df.index.duplicated(keep='last')]
+
+            option_df = option_df.copy()
+            option_df['total_vol_oi'] = option_df['total_vol'] + option_df['total_oi']
+            option_df['pcr_volume'] = option_df['put_vol'] / option_df['call_vol']
+            option_df['pcr_oi'] = option_df['put_oi'] / option_df['call_oi']
+            option_df = option_df[~option_df.index.isin(self.event_dates)]
+            return option_df.sort_index()
         except Exception as e:
             logger.error(f"Error formatting option data for {stock}: {str(e)}")
             raise
 
-    def get_aligned_data(self, stock: str, backtest_date: str | datetime = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        """
-        Fetch and align price and option data for a stock, optionally truncated to a backtest date for historical data.
-
-        Args:
-            stock (str): Stock ticker symbol.
-            backtest_date (str | datetime, optional): Backtest date for truncation.
-
-        Returns:
-            Tuple[pd.DataFrame, pd.DataFrame]: Aligned OHLCV and option data.
-
-        Raises:
-            ValueError: If data cannot be aligned or is insufficient.
-        """
+    def get_aligned_data(self, stock: str, backtest_date: Optional[str | datetime] = None) -> StockData:
         try:
             ohlcv = self.format_price_data(stock)
-            option_db = self.format_option_data(stock)
+            option_df = self.format_option_data(stock)
 
-            # Align date ranges
-            common_dates = ohlcv.index.intersection(option_db.index)
+            # Resample option data to daily frequency with sum aggregation
+            option_df = option_df.resample('1D').sum()
+            option_df = option_df[~option_df.index.isin(self.event_dates)]
+
+            # Align price data to option data's index range
+            start_date = option_df.index.min()
+            ohlcv = ohlcv.loc[start_date:].copy()
+            ohlcv = ohlcv[~ohlcv.index.isin(self.event_dates)]
+
+            # Replace zeros with NaN in option data
+            option_df = option_df.replace(0, np.nan)
+
+            # Align to common dates
+            common_dates = ohlcv.index.intersection(option_df.index)
             if common_dates.empty:
-                raise ValueError(f"No overlapping dates between price and option data for {stock}")
-            logger.info(f"Aligned data for {stock}: {len(common_dates)} common dates")
+                logger.error(f"No overlapping dates after alignment for {stock}")
+                raise ValueError(f"No overlapping dates after alignment for {stock}")
 
-            ohlcv = ohlcv.loc[common_dates]
-            option_db = option_db.loc[common_dates]
+            ohlcv = ohlcv.loc[common_dates].sort_index()
+            option_df = option_df.loc[common_dates].sort_index()
+            ohlcv.index = pd.DatetimeIndex(ohlcv.index, tz=None)
+            option_df.index = pd.DatetimeIndex(option_df.index, tz=None)
 
+            returns = self.returns_df
             if backtest_date is not None:
                 backtest_date = self.validate_backtest_date(backtest_date, ohlcv)
-                # Truncate historical data for analysis, but pass full ohlcv for returns
                 historical_ohlcv = ohlcv[ohlcv.index <= backtest_date]
-                historical_option_db = option_db[option_db.index <= backtest_date]
-                self.get_n_day_returns(stock, ohlcv, backtest_date)  # Use full ohlcv for future returns
+                historical_option_df = option_df[option_df.index <= backtest_date]
+                returns = self.get_n_day_returns(stock, ohlcv, backtest_date)
 
-                if historical_ohlcv.empty or historical_option_db.empty:
+                if historical_ohlcv.empty or historical_option_df.empty:
+                    logger.error(f"No data available after applying backtest filters for {stock}")
                     raise ValueError(f"No data available after applying backtest filters for {stock}")
 
-                return historical_ohlcv, historical_option_db
+                return StockData(
+                    ohlcv=historical_ohlcv,
+                    option_df=historical_option_df,
+                    returns=returns,
+                    stock=stock,
+                    backtest_date=backtest_date
+                )
 
-            return ohlcv, option_db
+            return StockData(
+                ohlcv=ohlcv,
+                option_df=option_df,
+                returns=returns,
+                stock=stock,
+                backtest_date=None
+            )
         except Exception as e:
             logger.error(f"Error getting aligned data for {stock}: {str(e)}")
             raise
@@ -188,26 +228,23 @@ class DataUtility:
             ValueError: If no future data is available.
         """
         try:
-            if 'Returns' not in price_df.columns:
-                price_df['Returns'] = price_df['Close'].pct_change()
+            if 'returns' not in price_df.columns:
+                price_df['returns'] = price_df['Close'].pct_change()
 
             backtest_date = pd.to_datetime(backtest_date)
-            # Get trading days starting from backtest_date
             trading_days = self.calendar.valid_days(
-                start_date=backtest_date,
-                end_date=backtest_date + pd.Timedelta(days=10)  # Extend to ensure 3 trading days
+                start_date=backtest_date - pd.Timedelta(days=1),
+                end_date=backtest_date + pd.Timedelta(days=10)
             ).tz_localize(None)
 
-            close_prices = price_df[['Close','Returns']].reindex(trading_days).dropna()
-            logger.info(f"Found {len(close_prices)} trading days for {stock} starting {backtest_date}")
+            close_prices = price_df[['Close', 'returns']].reindex(trading_days).ffill().dropna()
 
             if len(close_prices) < 2:
                 raise ValueError(f"Insufficient future data for {stock} starting {backtest_date}: {len(close_prices)} trading days available")
 
             current_price = close_prices['Close'].iloc[0] if backtest_date in close_prices.index else np.nan
-            current_returns = close_prices['Returns'].iloc[0] if backtest_date in close_prices.index else np.nan
+            current_returns = close_prices['returns'].iloc[1] if len(close_prices) > 1 else np.nan
 
-            # Initialize result DataFrame
             res = pd.DataFrame({
                 'date': [backtest_date],
                 'stock': [stock],
@@ -218,10 +255,10 @@ class DataUtility:
                 '3d': [np.nan]
             })
 
-            # Calculate buy-and-hold returns for available trading days
-            for n in range(1, min(4, len(close_prices))):
-                price_n_days = close_prices['Close'].iloc[n] if n < len(close_prices) else np.nan
-                if not np.isnan(price_n_days):
+            future_indices = close_prices.index[close_prices.index > backtest_date]
+            for n in range(1, min(4, len(future_indices) + 1)):
+                if n <= len(future_indices):
+                    price_n_days = close_prices['Close'].loc[future_indices[n-1]]
                     res[f'{n}d'] = (price_n_days - current_price) / current_price
                 else:
                     logger.warning(f"Insufficient data for {n}-day returns for {stock} at {backtest_date}")
@@ -232,27 +269,29 @@ class DataUtility:
             self.returns_df = pd.concat([self.returns_df, res], ignore_index=True)
             return res
         except Exception as e:
-            logger.error(f"Error calculating returns for {stock} at {backtest_date}: {str(e)}")
+            logger.error(f"Error calculating returns for {stock}: {str(e)}")
             raise
-
 
 if __name__ == "__main__":
     connections = get_path()
     data_util = DataUtility(connections)
-    stock = 'AAPL'
+    stocks = data_util.data_manager.Optionsdb.all_stocks
+    backtest_date = '2025-03-01'
+
+
     try:
-        ohlcv, option_db = data_util.get_aligned_data(stock, backtest_date='2025-03-01')
-        print(f"OHLCV Data for {stock}:\n{ohlcv.head()}\n")
-        print(f"Option Data for {stock}:\n{option_db.head()}\n")
-        returns = data_util.returns_df
-        print(f"Returns Data for {stock}:\n{returns}\n")
+        stock = 'gld'
+        # for stock in stocks:
+        #     try:
+        #         result = data_util.get_aligned_data(stock, backtest_date=backtest_date)
+        #         result_full = data_util.get_aligned_data(stock)
+        #     except Exception as e:
+        #         logger.error(f"Error processing {stock}: {str(e)}")
+        result_bt = data_util.get_aligned_data(stock, backtest_date=backtest_date)
+        result = data_util.get_aligned_data(stock)
 
-        # Ensure that current data is working
-        ohcv, option_db = data_util.get_aligned_data(stock)
-        print(f"Aligned OHLCV Data for {stock}:\n{ohcv.tail()}\n")
-        print(f"Aligned Option Data for {stock}:\n{option_db.tail()}\n")
-
-
+        logger.info(f"Aligned data for {stock} with backtest date {backtest_date}:\n{result.ohlcv.head()}")
+        logger.info(f"Option data for {stock}:\n{result.option_df}")
 
     except ValueError as e:
         logger.error(f"Error in main execution: {str(e)}")

@@ -5,25 +5,24 @@ import numpy as np
 from tqdm import tqdm
 import logging
 from pandas_market_calendars import get_calendar
-
+from datetime import datetime
 
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 
-from bin.models.trends.trend_detector import TrendAnalyzer
-from bin.models.trends.change_detection import ChangePointDetector
-from bin.models.trends.peakDetector import PeakDetector
+from bin.models.trends.utility import TrendUtility, DataUtility
+from bin.models.trends.Detect_class import Classifier, ClassificationLog
 from bin.models.trends.result_signals import VolumeOpenInterestWorksheet
-from bin.models.trends.clf import Classifier, ClassificationLog
-from datetime import datetime
 from bin.main import get_path
 from main import Manager
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class TrendResult:
@@ -81,92 +80,101 @@ class TResults:
         self.lookback_days = lookback_days
         self.window_size = window_size
         self.period = period
-        self.data_manager = Manager(connections)
-        self.stocks = self.data_manager.Pricedb.stocks['mag8']
-        self.trend_analyzer = TrendAnalyzer(period=self.period)
-        self.peak_detector = PeakDetector(prominence=0.5, distance=2)
-        self.all_worksheets = []  # Persistent list to store all worksheets
-        self.returns_df = []  # DataFrame to store returns data
+        self.data_utility = DataUtility(connections)
+        self.trend_utility = TrendUtility()
+        self.stocks = self.data_utility.stocks
+        self.all_worksheets = []
+        self.returns_df = []
+        self.results_worksheet = ResultsWorksheet(worksheets=[], timestamp=datetime.now())
 
-    def get_aligned_data(self, stock: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        ohlcv = self.data_manager.Pricedb.ohlc(stock).dropna().sort_index()
-        ohlcv['close_chng'] = ohlcv['Close'].diff()
-        ohlcv['returns'] = ohlcv['Close'].pct_change()
-        returns_df = ohlcv['returns'].dropna().to_frame(name='returns')
+    def get_aligned_data(self, stock: str, backtest_date: Optional[str] = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        ohlcv, option_df = self.data_utility.get_aligned_data(stock, backtest_date=backtest_date)
+        if backtest_date is not None: 
+            self.returns_df.append(self.data_utility.returns_df.copy())
+        return ohlcv, option_df
 
-
-        ohlcv = ohlcv.tail(self.lookback_days)
-        option_db = self.data_manager.Optionsdb.get_daily_option_stats(stock).dropna().sort_index()
-        if ohlcv.empty or option_db.empty:
-            raise ValueError(f"No data available for {stock}")
-        
-        # Event dates
-        event_dates = get_calendar('NYSE').holidays().holidays
-        ohlcv = ohlcv[~ohlcv.index.isin(event_dates)]
-        option_db = option_db[~option_db.index.isin(event_dates)]
-
-        back_test_date = '2025-03-01'  # Example back-test date
-        d = ohlcv[['Close']][back_test_date:]
-        d['stock'] = stock
-        d['Returns'] = d['Close'].pct_change()
-        d['1d'] = d['Returns'].cumsum().shift(-1)
-        d['2d'] = d['Returns'].cumsum().shift(-2)
-        d['3d'] = d['Returns'].cumsum().shift(-3)
-        self.returns_df.append(d.iloc[1].to_frame().T)
-
-
-
-
-        ohlcv = ohlcv[ohlcv.index <= back_test_date]
-        option_db = option_db[option_db.index <= back_test_date]
-
-        return ohlcv, option_db
-    
     def analyze_single_stock(self, stock: str) -> Optional[List[TrendResult]]:
         try:
-            ohlcv, option_db = self.get_aligned_data(stock)
+            ohlcv, option_df = self.get_aligned_data(stock)
+            if ohlcv is None or option_df is None:
+                logger.warning(f"Skipping analysis for {stock} due to invalid or missing data")
+                return None
+
+            min_data_points = 15
+            if ohlcv['Price'].count() < min_data_points or option_df['total_vol'].count() < min_data_points:
+                logger.warning(f"Insufficient non-NaN data for {stock}: OHLCV {ohlcv['Price'].count()}, Option {option_df['total_vol'].count()}")
+                return None
+
+
+            stock_data = self.data_utility.get_aligned_data(stock, backtest_date='2025-03-01' if self.returns_df else None)
+            trend_results = self.trend_utility.analyze_trends(stock_data)
+            if not trend_results:
+                logger.warning(f"No trend analysis results for {stock}")
+                return None
+
+            # Align metrics with utility.py's analyzed metrics
             metrics = {
                 'returns': ohlcv['returns'],
-                'close_prices': ohlcv['Close'],
+                'close_prices': ohlcv['Price'],
                 'stock_volume': ohlcv['Volume'],
-                'options_volume': option_db['total_vol'],
-                'oi': option_db['total_oi'],
-                'atm_iv': option_db['atm_iv'], 
-                'call_oi': option_db['call_oi'],
-                'put_oi': option_db['put_oi'],
-                'call_volume': option_db['call_vol'],
-                'put_volume': option_db['put_vol'],
+                'options_volume': option_df['total_vol'],
+                'oi': option_df['total_oi'],
+                'total_vol_oi': option_df['total_vol_oi'],
+                'pcr_volume': option_df['pcr_volume'],
+                'pcr_oi': option_df['pcr_oi']
             }
+            # Additional metrics for VolumeOpenInterestWorksheet
+            supplementary_metrics = {
+                'atm_iv': option_df['atm_iv'],
+                'call_oi': option_df['call_oi'],
+                'put_oi': option_df['put_oi'],
+                'call_volume': option_df['call_vol'],
+                'put_volume': option_df['put_vol']
+            }
+            default_chng = pd.Series(0.0, index=ohlcv.index)
             chng_map = {
-                'close_prices': None,
-                'stock_volume': option_db['total_vol_chng'],
-                'options_volume': option_db['total_vol_chng'],
-                'oi': option_db['total_oi_chng'],
-                'atm_iv': option_db['atm_iv_chng'],
-                'call_oi': option_db['call_oi_chng'],
-                'put_oi': option_db['put_oi_chng'],
-                'call_volume': option_db['call_vol_chng'],
-                'put_volume': option_db['put_vol_chng'],
+                'close_prices': default_chng,
+                'stock_volume': default_chng,
+                'options_volume': default_chng,
+                'oi': default_chng,
+                'total_vol_oi': default_chng,
+                'pcr_volume': default_chng,
+                'pcr_oi': default_chng,
+                'atm_iv': default_chng,
+                'call_oi': default_chng,
+                'put_oi': default_chng,
+                'call_volume': default_chng,
+                'put_volume': default_chng
             }
 
             results = []
-            price_data = ohlcv['Close']
+            price_data = ohlcv['Price']
             price_chng_data = ohlcv['close_chng']
             returns_data = ohlcv['returns']
             returns_chng_data = ohlcv['returns'].diff().bfill()
 
-            # Compute PCR volume and OI ratios
-            pcr_vol = option_db['put_vol'] / option_db['call_vol'].replace(0, pd.NA)
-            pcr_vol = pcr_vol.fillna(0.0)
-            pcr_oi = option_db['put_oi'] / option_db['call_oi'].replace(0, pd.NA)
-            pcr_oi = pcr_oi.fillna(0.0)
+            pcr_vol = option_df['pcr_volume']
+            pcr_oi = option_df['pcr_oi']
 
-            # Store trend directions for relevant metrics
             trend_directions = {}
-
-            # Classify all metrics, including PCRs
             classification_logs = {}
+
+            # Process analyzed metrics
             for metric_name, data in metrics.items():
+                if data is None or data.empty or data.count() < min_data_points:
+                    logger.warning(f"Skipping {metric_name} for {stock} due to missing or insufficient non-NaN data")
+                    continue
+
+                # Try long_term, then short_term, then ytd
+                long_term_results = trend_results.get('long_term', {}).get(metric_name, {})
+                short_term_results = trend_results.get('short_term', {}).get(metric_name, {})
+                ytd_results = trend_results.get('ytd', {}).get(metric_name, {})
+                
+                results_data = long_term_results or short_term_results or ytd_results or {}
+                if not results_data:
+                    logger.warning(f"Skipping {metric_name} for {stock} due to empty trend results in all periods")
+                    continue
+
                 classifier = Classifier(
                     data=data,
                     open_interest=chng_map.get(metric_name),
@@ -177,57 +185,90 @@ class TResults:
                 category, blowoff, log_entry = classifier.classify(stock, metric_name)
                 classification_logs[metric_name] = log_entry
 
-                trend_direction, seasonality, slope = self.trend_analyzer.analyze(data)
-                # Store trend direction for relevant metrics
-                if metric_name in ['close_prices', 'stock_volume', 'oi', 'options_volume', 'returns']:
-                    trend_directions[metric_name] = trend_direction
+                trend_direction = results_data.get('trend', 'unknown')
+                seasonality = results_data.get('seasonality', 'unknown')
+                slope = results_data.get('slope', 0.0)
+                change_point = results_data.get('change_point')
+                peaks = results_data.get('peaks')
+                valleys = results_data.get('valleys')
 
-                peaks = self.peak_detector.find_peaks(data.values)
-                peak_dates = data.index[peaks]
-                valleys = self.peak_detector.find_valleys(data.values)
-                valley_dates = data.index[valleys]
-                try:
-                    cp = ChangePointDetector(data, scale=True, period=self.period, window_size=self.window_size)
-                    change_point = cp.get_last_change_point()
-                except Exception as e:
-                    print(f"Error in change point detection for {stock}: {e}")
-                    change_point = 0.0
+                trend_directions[metric_name] = trend_direction
 
-                trend_results = TrendResult(
+                trend_result = TrendResult(
                     stock=stock,
                     name=metric_name,
                     trend_direction=trend_direction,
                     seasonality=seasonality,
                     slope=slope,
                     change_point=change_point,
-                    valley=valley_dates.max() if len(valley_dates) > 0 else None,
-                    peaks=peak_dates.max() if len(peak_dates) > 0 else None,
-                    metric_status={'Low': 'below', 'Average': 'at', 'High': 'above', 'Blowoff': 'above'}[category],
+                    valley=valleys,
+                    peaks=peaks,
+                    metric_status={'Low': 'below', 'Average': 'at', 'High': 'above', 'Blowoff': 'above'}.get(category, 'unknown'),
                     blowoff_flag=blowoff
                 )
-                ### End Loop appending TrendResults. 
-                results.append(trend_results)
+                results.append(trend_result)
 
-            # Classify PCRs
-            classifier_pcr_vol = Classifier(
-                data=pcr_vol,
-                lookback=self.lookback_days,
-                period=self.period,
-                window_size=self.window_size
-            )
-            _, _, pcr_vol_log = classifier_pcr_vol.classify(stock, 'pcr_vol')
-            classification_logs['pcr_vol'] = pcr_vol_log
+            # Process supplementary metrics for classification only
+            for metric_name, data in supplementary_metrics.items():
+                if data is None or data.empty or data.count() < min_data_points:
+                    logger.warning(f"Skipping {metric_name} for {stock} due to missing or insufficient non-NaN data")
+                    continue
 
-            classifier_pcr_oi = Classifier(
-                data=pcr_oi,
-                lookback=self.lookback_days,
-                period=self.period,
-                window_size=self.window_size
-            )
-            _, _, pcr_oi_log = classifier_pcr_oi.classify(stock, 'pcr_oi')
-            classification_logs['pcr_oi'] = pcr_oi_log
+                classifier = Classifier(
+                    data=data,
+                    open_interest=chng_map.get(metric_name),
+                    lookback=self.lookback_days,
+                    period=self.period,
+                    window_size=self.window_size
+                )
+                category, blowoff, log_entry = classifier.classify(stock, metric_name)
+                classification_logs[metric_name] = log_entry
 
-            # Create a single worksheet per stock with all metrics
+                # No trend analysis for supplementary metrics
+                trend_result = TrendResult(
+                    stock=stock,
+                    name=metric_name,
+                    trend_direction='unknown',  # Explicitly set as not analyzed
+                    seasonality='unknown',
+                    slope=0.0,
+                    change_point=None,
+                    valley=None,
+                    peaks=None,
+                    metric_status={'Low': 'below', 'Average': 'at', 'High': 'above', 'Blowoff': 'above'}.get(category, 'unknown'),
+                    blowoff_flag=blowoff
+                )
+                results.append(trend_result)
+
+            if not results:
+                logger.warning(f"No valid trend results generated for {stock}")
+                return None
+
+            if pcr_vol.count() >= min_data_points and pcr_vol.nunique() >= 5:
+                classifier_pcr_vol = Classifier(
+                    data=pcr_vol,
+                    lookback=self.lookback_days,
+                    period=self.period,
+                    window_size=self.window_size
+                )
+                _, _, pcr_vol_log = classifier_pcr_vol.classify(stock, 'pcr_vol')
+                classification_logs['pcr_vol'] = pcr_vol_log
+            else:
+                logger.warning(f"Skipping pcr_volume classification for {stock}: {pcr_vol.count()} valid points, {pcr_vol.nunique()} unique values")
+                classification_logs['pcr_vol'] = None
+
+            if pcr_oi.count() >= min_data_points and pcr_oi.nunique() >= 5:
+                classifier_pcr_oi = Classifier(
+                    data=pcr_oi,
+                    lookback=self.lookback_days,
+                    period=self.period,
+                    window_size=self.window_size
+                )
+                _, _, pcr_oi_log = classifier_pcr_oi.classify(stock, 'pcr_oi')
+                classification_logs['pcr_oi'] = pcr_oi_log
+            else:
+                logger.warning(f"Skipping pcr_oi classification for {stock}: {pcr_oi.count()} valid points, {pcr_oi.nunique()} unique values")
+                classification_logs['pcr_oi'] = None
+
             worksheet = VolumeOpenInterestWorksheet(
                 stock=stock,
                 classification_logs=classification_logs,
@@ -240,27 +281,29 @@ class TResults:
                 oi_chng_data=chng_map['oi'],
                 option_volume_data=metrics['options_volume'],
                 option_volume_chng_data=chng_map['options_volume'],
-                put_volume=option_db['put_vol'],
-                call_volume=option_db['call_vol'],
-                put_oi=option_db['put_oi'],
-                call_oi=option_db['call_oi'],
-                trend_directions=trend_directions  # Pass the trend directions
+                put_volume=option_df['put_vol'],
+                call_volume=option_df['call_vol'],
+                put_oi=option_df['put_oi'],
+                call_oi=option_df['call_oi'],
+                trend_directions=trend_directions
             )
-            self.all_worksheets.append(worksheet)  # Append to persistent list
-
+            self.all_worksheets.append(worksheet)
             self.results_worksheet = ResultsWorksheet(worksheets=self.all_worksheets, timestamp=datetime.now())
+
             return results
         except Exception as e:
-            logging.error(f"Error analyzing {stock}: {str(e)}")
+            logger.error(f"Error analyzing {stock}: {str(e)}")
             return None
-        
+
     def __convert_to_dataframe(self, results: List[TrendResult]) -> pd.DataFrame:
         data = []
         for i in results:
+            if i is None:
+                continue
             for result in i:
                 data.append({
                     'stock': result.stock,
-                    'name': result.name,  # Changed from 'metric' to 'name' to match TrendResult and trend_summary.py
+                    'name': result.name,
                     'trend_direction': result.trend_direction,
                     'seasonality': result.seasonality,
                     'slope': result.slope,
@@ -275,13 +318,14 @@ class TResults:
                     )
                 })
         df = pd.DataFrame(data)
-        return df 
+        return df
 
     def analyze_stocks(self, stocks: Optional[List[str]] = None) -> Tuple[pd.DataFrame, ResultsWorksheet]:
         stocks_to_analyze = stocks if stocks is not None else self.stocks
         results = []
-        self.all_worksheets = []  # Reset the list for a new analysis
-        
+        self.all_worksheets = []
+        self.results_worksheet = ResultsWorksheet(worksheets=[], timestamp=datetime.now())
+
         pbar = tqdm(stocks_to_analyze, desc='Analyzing Stocks')
         for stock in pbar:
             pbar.set_description(f'Processing {stock}')
@@ -289,15 +333,18 @@ class TResults:
             if result:
                 results.append(result)
                 pbar.set_postfix({'Success': True})
+            else:
+                pbar.set_postfix({'Success': False})
 
         self.result_df = self.__convert_to_dataframe(results)
         return self.result_df, self.results_worksheet
-    
+
 def main():
     """Example usage of the TResults class."""
-    import json 
+    import json
     connections = get_path()
     stocks = json.load(open(connections['ticker_path'], 'r'))['all_stocks']
+    stocks = ['aapl']
     detector = TResults(connections, lookback_days=150)
     results_df, worksheet = detector.analyze_stocks(stocks=stocks)
     wdf = worksheet.to_df()
@@ -305,22 +352,31 @@ def main():
     print(results_df)
     print("\nWorksheet Summary:")
     print(f"Total Bullish Signals: {worksheet.total_bullish}")
-    print(wdf[wdf.Bullish == True])
+    if not wdf.empty and 'Bullish' in wdf.columns:
+        print(wdf[wdf['Bullish'] == True])
+    else:
+        print("No bullish signals (empty or missing Bullish column)")
     print(f"Total Bearish Signals: {worksheet.total_bearish}")
-    print(wdf[wdf.Bearish == True])
+    if not wdf.empty and 'Bearish' in wdf.columns:
+        print(wdf[wdf['Bearish'] == True])
+    else:
+        print("No bearish signals (empty or missing Bearish column)")
     print("\nWorksheet Details (Cross-Stock Analysis):")
     print(wdf)
     cols = ['Stock', 'PCR_OI', 'Price_Delta', 'Volume_Category', 'OI_Category']
-    # Adjusted analysis: Stocks with elevated PCR OI (>1.0) and bearish signals
-    print("\nStocks with Elevated PCR OI (>1.0) and Bearish Signals:")
-    high_pcr_oi_bearish = wdf[(wdf['PCR_OI'] > 1) & (wdf['Bearish'])][cols]
-    print(high_pcr_oi_bearish if not high_pcr_oi_bearish.empty else "No stocks meet the criteria.")
-    # Additional analysis: Top 3 stocks by PCR OI
+    if not wdf.empty and all(col in wdf.columns for col in cols):
+        high_pcr_oi_bearish = wdf[(wdf['PCR_OI'] > 1) & (wdf['Bearish'])][cols]
+        print("\nStocks with Elevated PCR OI (>1.0) and Bearish Signals:")
+        print(high_pcr_oi_bearish if not high_pcr_oi_bearish.empty else "No stocks meet the criteria.")
+    else:
+        print("\nNo stocks with elevated PCR OI (>1.0) and Bearish signals (empty or missing columns)")
     results_df.to_csv("trend_analysis_results.csv", index=False)
-    wdf.to_csv("worksheet_results.csv", index=False)
-    rdf = pd.concat(detector.returns_df)
+    if not wdf.empty:
+        wdf.to_csv("worksheet_results.csv", index=False)
+    rdf = pd.concat(detector.returns_df) if detector.returns_df else pd.DataFrame()
     print(rdf)
-    rdf.to_csv("returns_data.csv", index=True)
+    if not rdf.empty:
+        rdf.to_csv("returns_data.csv", index=True)
 
 if __name__ == "__main__":
     main()

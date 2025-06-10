@@ -1,4 +1,4 @@
-from trends.trend_detector import TrendAnalyzer
+from bin.models.trends.Detect_trend import TrendAnalyzer
 from option_stats_model_setup import data as OptionsData
 from indicator_model_setup import data as IndicatorData
 

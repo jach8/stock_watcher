@@ -14,11 +14,10 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 
-from bin.models.trends.trend_detector import TrendAnalyzer
-from bin.models.trends.change_detection import ChangePointDetector
-from bin.models.trends.peakDetector import PeakDetector
+from bin.models.trends.Detect_trend import TrendAnalyzer
+from bin.models.trends.Detect_peak import PeakDetector
 from bin.models.trends.voi import VolumeOpenInterestWorksheet
-from bin.models.trends.clf import Classifier, ClassificationLog
+from bin.models.trends.Detect_class import Classifier, ClassificationLog
 from datetime import datetime
 from bin.main import get_path
 from main import Manager
@@ -35,7 +34,6 @@ class TrendResult:
     trend_direction: str
     seasonality: str
     slope: float
-    change_point: Optional[float] = None
     valley: Any = None
     peaks: Any = None
     metric_status: Optional[str] = None
@@ -48,7 +46,6 @@ class TrendResult:
             "trend_direction": self.trend_direction,
             "seasonality": self.seasonality,
             "slope": self.slope,
-            "change_point": self.change_point,
             "valley": self.valley,
             "peaks": self.peaks,
             "metric_status": self.metric_status,
@@ -164,12 +161,6 @@ class TResults:
                 peak_dates = data.index[peaks]
                 valleys = self.peak_detector.find_valleys(data.values)
                 valley_dates = data.index[valleys]
-                try:
-                    cp = ChangePointDetector(data, scale=True, period=self.period, window_size=self.window_size)
-                    change_point = cp.get_last_change_point()
-                except Exception as e:
-                    print(f"Error in change point detection for {stock}: {e}")
-                    change_point = 0.0
 
                 trend_results = TrendResult(
                     stock=stock,
@@ -177,7 +168,6 @@ class TResults:
                     trend_direction=trend_direction,
                     seasonality=seasonality,
                     slope=slope,
-                    change_point=change_point,
                     valley=valley_dates.max() if len(valley_dates) > 0 else None,
                     peaks=peak_dates.max() if len(peak_dates) > 0 else None,
                     metric_status={'Low': 'below', 'Average': 'at', 'High': 'above', 'Blowoff': 'above'}[category],
@@ -241,7 +231,6 @@ class TResults:
                     'trend_direction': result.trend_direction,
                     'seasonality': result.seasonality,
                     'slope': result.slope,
-                    'change_point': result.change_point,
                     'last_valley': result.valley,
                     'last_peak': result.peaks,
                     'metric_status': result.metric_status,
@@ -291,6 +280,7 @@ def main():
     print("\nWorksheet DataFrame:")
     print(wdf)
     cols = [
+    'Stock',
     'Price_Trend_Direction',
     'Volume_Category',
     'Volume_Trend_Direction',

@@ -45,9 +45,9 @@ class Classifier:
     def classify(self, stock: str, metric: str) -> Tuple[str, bool, ClassificationLog]:
         valid_data = self.data.tail(self.lookback)
         oi_factor = 1.0
-        if self.open_interest is not None:
-            oi_trend = np.polyfit(np.arange(len(self.open_interest)), self.open_interest, 1)[0]
-            oi_factor = 1 + (oi_trend / self.open_interest.mean()) if oi_trend != 0 else 1.0
+        # if self.open_interest is not None:
+        #     oi_trend = np.polyfit(np.arange(len(self.open_interest)), self.open_interest, 1)[0]
+        #     oi_factor = 1 + (oi_trend / self.open_interest.mean()) if oi_trend != 0 else 1.0
 
         # Compute thresholds
         low_threshold = valid_data.quantile(0.25) * oi_factor

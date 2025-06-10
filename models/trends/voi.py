@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import pandas as pd
 from typing import List, Optional
-from bin.models.trends.clf import ClassificationLog
+from bin.models.trends.Detect_class import ClassificationLog
 
 @dataclass
 class WorksheetEntry:

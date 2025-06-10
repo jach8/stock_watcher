@@ -5,7 +5,6 @@ from itertools import product
 from pandas import Series, DataFrame
 from statsmodels.tsa.seasonal import seasonal_decompose
 from dataclasses import dataclass
-from .trend_detector import TrendAnalyzer
 
 
 class ChangePointDetector:
@@ -42,11 +41,12 @@ class ChangePointDetector:
         self.scale: bool = scale
         self.period: int = period
         self.window_size: Optional[int] = window_size if window_size is not None else 30  # Default to 30 days
-        
+
         # Decompose the time series
-        self.trend_analyzer = TrendAnalyzer(period=self.period, model='additive')
-        self.decomposed_data = self.trend_analyzer.decompose(self.data)
-        
+        self.decomposed_data = seasonal_decompose(self.data, model='additive', period=self.period)
+        self.residual = self.decomposed_data.resid
+        self.trend = self.decomposed_data.trend
+
         # Use residual for change point detection
         self.processed_data: np.ndarray = self._preprocess_data()
         
@@ -59,7 +59,7 @@ class ChangePointDetector:
         Raises:
         - ValueError: If data range is zero and normalization is requested
         """
-        data = np.array(self.decomposed_data.residual, dtype=np.float64)
+        data = np.array(self.trend, dtype=np.float64)
         if self.scale:
             data_min, data_max = np.min(data), np.max(data)
             if data_max == data_min:
@@ -272,6 +272,8 @@ if __name__ == "__main__":
     noise = np.random.normal(0, 5, n)
     simulated_data = trend + noise
     data = pd.Series(simulated_data, index=dates)
+    data.iloc[49:] = data.iloc[49:] + 20  # Introduce a change point at index 49
+    data.iloc[-1] = data.iloc[-1] + 10  # Another change point at the end
 
 
     # Initialize detector
@@ -300,5 +302,4 @@ if __name__ == "__main__":
     print(f"Triggers: {best_result_df['Signal'].sum()}")
 
     # Last change point
-    last_change_point = detector.get_last_change_point()
-    print(f"Last Change Point: {last_change_point}")
+    print(f"Last Change Point: {detector.get_last_change_point()}")
