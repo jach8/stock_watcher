@@ -32,25 +32,25 @@ class TrendUtility:
         if self.periods_config is None:
             self.periods_config = {
                 'short_term': {
-                    'lookback': 30,
-                    'window_size': 5,
+                    'lookback': 60,
+                    'window_size': 6,
                     'analyzer_period': 3,
-                    'min_data_points': 15,
-                    'min_unique_values': 2  # Stricter requirement for short_term
+                    'min_data_points': 10,
+                    'min_unique_values': 4  # Stricter requirement for short_term
                 },
                 'long_term': {
-                    'lookback': 90,
-                    'window_size': 30,
-                    'analyzer_period': 21,
-                    'min_data_points': 90,
+                    'lookback': 180,
+                    'window_size': 10,
+                    'analyzer_period': 10,
+                    'min_data_points': 80,
                     'min_unique_values': 10
                 },
                 'ytd': {
                     'lookback': None,  # Computed dynamically
-                    'window_size': 150,
-                    'analyzer_period': 10,
+                    'window_size': 20,
+                    'analyzer_period': 7,
                     'min_data_points': 20,
-                    'min_unique_values': 5
+                    'min_unique_values': 2
                 }
             }
 
@@ -220,7 +220,7 @@ class TrendUtility:
                                 logger.debug(f"Skipping {metric_name} in {period} for {stock}: data length {len(data_filled)} too short for analyzer period {config['analyzer_period']}")
                                 period_results[metric_name] = {}
                                 continue
-
+                            #### There seems to be an error here: 
                             trend_direction, seasonality, slope = self.analyzers[period].analyze(data_filled)
                             classifier = Classifier(
                                 data=data_filled,
@@ -229,6 +229,8 @@ class TrendUtility:
                                 window_size=config['window_size']
                             )
                             category, blowoff, classification_log = classifier.classify(stock, metric_name)
+
+                            #### Error occuring here too 
                             peak_data = peak_detection.get_peak_data(data)
                             peaks = peak_data.peak_values
                             valleys = peak_data.valley_values

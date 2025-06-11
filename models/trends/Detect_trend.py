@@ -8,6 +8,7 @@ from functools import lru_cache
 @dataclass
 class TimeSeriesData:
     """Data container for time series analysis."""
+    original_data: np.ndarray| pd.Series
     trend: np.ndarray| pd.Series
     seasonal: np.ndarray| pd.Series
     residual: np.ndarray| pd.Series
@@ -60,6 +61,7 @@ class TrendAnalyzer(ABC):
         )
         
         return TimeSeriesData(
+            original_data=data,
             trend=result.trend,
             seasonal=result.seasonal,
             residual=result.resid,
@@ -79,13 +81,14 @@ class TrendAnalyzer(ABC):
         """
         checks = resample_periods
         name = data.observed.name
-        # Report the trend for each check, (lookbac = check in checks)
+        # Report the trend for each check, get the slope of the trend line 
         bull = 0; bear = 0
         for check in checks:
-            last_trend = data.trend.resample(check).last().diff().tail(1).values[0]
-            if last_trend > 0:
+            # last_trend = data.trend.resample(check).last().diff().tail(1).values[0]
+            trend_slope = self.__lr_slope(data)
+            if trend_slope > 0:
                 bull += 1
-            elif last_trend < 0:
+            elif trend_slope < 0:
                 bear += 1
             else:
                 if bull > bear:
@@ -146,7 +149,8 @@ class TrendAnalyzer(ABC):
         Returns:
             TimeSeriesData: Decomposed components
         """
-        # Normalize
+        # Normaliz
+        data = data.bfill().ffill()
         data = (data / data[0]) - 1
         tmp = self.decompose(data)
         self.data = tmp

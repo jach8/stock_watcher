@@ -202,6 +202,7 @@ class PeakDetector(ABC):
         Returns:
             PeakData: Object containing peaks, valleys, and change points
         """
+        data = data.bfill().ffill().dropna()
         peaks = self.find_peaks(data.to_numpy())
         valleys = self.find_valleys(data.to_numpy())
         changepoints = self.find_trend_change_points(data.to_numpy())

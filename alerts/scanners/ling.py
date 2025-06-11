@@ -28,13 +28,14 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 
 from bin.alerts.iterator import Iterator 
-
+from bin.alerts.scanners.dxp import dxp
 
 class Scanner(Iterator):
     def __init__(self, connections = None):
         super().__init__(connections)
         self.stock_dict = json.load(open(connections['ticker_path'], 'r'))
         self.todays_date = dt.datetime.today().date()
+        self.connections = connections
     
         
     def pct_chg(self, stock):
@@ -215,10 +216,18 @@ class Scanner(Iterator):
             df.to_sql(table, write_connection, if_exists = 'replace', index = False)
             print(df)
 
+    def dxp(self, stock):
+        """
+        Run the dxp scanner on a specific stock.
+        """
+        dxp_scanner = dxp(self.connections)
+        return dxp_scanner.run(stock)
+
 
 
 if __name__ == "__main__":
     from bin.main import get_path
     connections = get_path()
     sc = Scanner(connections)
-    sc.scan_contracts()
+    # sc.scan_contracts()
+    print(sc.dxp('amzn'))

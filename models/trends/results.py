@@ -197,6 +197,7 @@ def main():
     import json
     connections = get_path()
     stocks = json.load(open(connections['ticker_path'], 'r'))['all_stocks']
+    stocks = [x for x in stocks if x not in ['ardx','moo','bil']]
     detector = TResults(connections, lookback_days=150)
     lodf = []; lowdf = []
     for stock in tqdm(stocks, desc="Analyzing Stocks"):

@@ -90,7 +90,13 @@ class Manager:
 
 	def run(self, stock):
 		pass
-
+	def find_plays(self, stock, **kwargs):
+		
+		"""
+		Find plays for a given stock.
+		"""
+		# return self.Optionsdb.find_plays(stock, **kwargs)
+		pass
 	
 if __name__ == "__main__":
 	pre = ''
