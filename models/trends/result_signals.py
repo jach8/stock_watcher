@@ -108,12 +108,18 @@ class VolumeOpenInterestWorksheet:
 
     def compute_bullish_signals(self, entry: WorksheetEntry) -> int:
         """Compute bullish signals based on categorical conditions."""
-        return 1 if (
-            entry.price_trend_direction == 'up' and
-            (entry.volume_category in ['High', 'Blowoff'] or entry.oi_category in ['High', 'Blowoff']) and
-            entry.pcr_oi_category in ['Low', 'Average'] and
-            entry.seasonality == 'high'
-        ) else 0
+        price_trend_up = entry.price_trend_direction == 'up'
+        volume_trend_up = entry.volume_trend_direction == 'up'
+        oi_trend_up = entry.oi_trend_direction == 'up'
+        option_volume_trend_up = entry.option_volume_trend_direction == 'up'
+        todays_return_down = entry.returns_category == 'Down'
+        todays_volume_low = entry.today_volume_category in ['Low', 'Average']
+        todays_oi_low = entry.today_oi_category in ['Low', 'Average']
+        todays_option_volume_low = entry.today_options_volume_category in ['Low', 'Average']
+
+        criteria = (price_trend_up and volume_trend_up and oi_trend_up and option_volume_trend_up and
+                    todays_return_down and todays_volume_low and todays_oi_low and todays_option_volume_low)
+        return 1 if (criteria) else 0
 
     def compute_bearish_signals(self, entry: WorksheetEntry) -> int:
         """Compute bearish signals based on categorical conditions."""

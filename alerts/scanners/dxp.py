@@ -13,12 +13,6 @@ import sqlite3 as sql
 import json
 import re
 
-
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).resolve().parents[3]))
-
-
 class dxp:
     def __init__(self, connections):
         self.stocks = json.load(open(connections['ticker_path'], 'r'))['all_stocks']
@@ -234,6 +228,19 @@ class dxp:
         return pd.concat(out)
         
 if __name__ == "__main__":
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).resolve().parents[3]))
+    from bin.main import get_path
     from tqdm import tqdm 
-    p = Play()
-    print(p.run('iei'))
+    connections = get_path()
+    p = dxp(connections)
+    print(p.run('spy'))
+    """
+    Why is there 384 Contreacts Returned? 
+    - Can we get a Simulated Price to compare to the current price? 
+    0 We want the lowest possible price with the least be needed to break even 
+    use recent highs and lows to determine a good strike price 
+    What are the winners doing? - (In the money contracts)
+    What are the losers doing? - (Out of the money contracts)
+    """
