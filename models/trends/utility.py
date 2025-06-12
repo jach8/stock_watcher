@@ -32,18 +32,18 @@ class TrendUtility:
         if self.periods_config is None:
             self.periods_config = {
                 'short_term': {
-                    'lookback': 60,
+                    'lookback': 100,
                     'window_size': 6,
                     'analyzer_period': 3,
                     'min_data_points': 10,
                     'min_unique_values': 4  # Stricter requirement for short_term
                 },
                 'long_term': {
-                    'lookback': 180,
-                    'window_size': 10,
+                    'lookback': 600,
+                    'window_size': 20,
                     'analyzer_period': 10,
-                    'min_data_points': 80,
-                    'min_unique_values': 10
+                    'min_data_points': 20,
+                    'min_unique_values': 2
                 },
                 'ytd': {
                     'lookback': None,  # Computed dynamically
