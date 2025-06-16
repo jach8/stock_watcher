@@ -167,7 +167,7 @@ if __name__ == "__main__":
     import sys
     from pathlib import Path
     sys.path.append(str(Path(__file__).resolve().parents[3]))
-    from bin.alerts.flows.backtestingUtility import cp_backtesting_utility
+    # from bin.alerts.flows.backtestingUtility import cp_backtesting_utility
     from bin.models.option_stats_model_setup import data
     from bin.main import get_path
     from main import Manager 
