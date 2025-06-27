@@ -90,6 +90,16 @@ class Prices(UpdateStocks):
         Raises:
             DatabaseConnectionError: If database connection fails
             FileNotFoundError: If required files are not found
+
+        Methods:
+            - update_stock_prices: Update stock prices in the database
+            - custom_q: Execute a custom SQL query on the daily database
+            - _get1minCl: Retrieve 1-minute close prices for a specified stock
+            - get_intraday_close: Retrieve intraday closing prices for multiple stocks
+            - close_connections: Close all database connections
+            
+
+
         """
         super().__init__(connections)
         self.execution_start_time = time.time()
@@ -725,14 +735,14 @@ if __name__ == "__main__":
      
 
     p = Prices(connections)
-    # print(p.get_daily_technicals('amzn', start_date = '2024-08-01' ))
+    print(p.get_daily_technicals('amzn', start_date = '2024-08-01' ))
 
-    d = p.model_preparation('spy', daily = True, ma = 'kama', start_date = "2023-01-01")
-    for i in d: 
-        try:
-            print(i, d[i].shape)
-        except:
-            print(i, d[i])
+    # d = p.model_preparation('spy', daily = True, ma = 'kama', start_date = "2023-01-01")
+    # for i in d: 
+    #     try:
+    #         print(i, d[i].shape)
+    #     except:
+    #         print(i, d[i])
 
 
 

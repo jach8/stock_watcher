@@ -223,7 +223,7 @@ if __name__ == "__main__":
     from pathlib import Path
     sys.path.append(str(Path(__file__).resolve().parents[3]))
     from bin.min import Manager
-    from stockData import StockData
+    from bin.stockData import StockData
     import numpy as np
     from sklearn.preprocessing import StandardScaler
 

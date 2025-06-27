@@ -154,7 +154,7 @@ if __name__ == "__main__":
 
     sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
-    from stockData import StockData
+    from bin.stockData import StockData
     from bin.main import get_path 
     from main import Manager 
 
@@ -177,5 +177,9 @@ if __name__ == "__main__":
     # Fit the model
     results = model.fit_mod()
     print(results)
+
+
+
+
 
 

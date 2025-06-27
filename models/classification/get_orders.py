@@ -8,7 +8,7 @@ from pathlib import Path
 from .clda import ClassificationModel
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 
-from stockData import StockData
+from bin.stockData import StockData
 from main import Manager
 from bin.utils.tools import encode_orders, pretty_print
 from backtest.strategies import Policy
